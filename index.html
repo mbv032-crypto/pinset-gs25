@@ -806,14 +806,21 @@ LANGS.forEach(l=>{
   $("langs").appendChild(b);
 });
 
-$("btnStart").onclick = startCamera;
+function resetScanState(){
+  $("resultSec").hidden=true; preview.hidden=true; $("idle").hidden=false;
+  state.lastQR=""; state.target=""; $("srcTag").textContent="—"; $("srcTag").className="src"; quiet();
+}
+
+$("btnStart").onclick = ()=>{
+  resetScanState();
+  startCamera();
+};
 $("btnStop").onclick  = stopCamera;
 $("btnTorch").onclick = toggleTorch;
 $("btnPick").onclick  = ()=> (ENV.inApp ? $("fileCam") : $("filePick")).click();
 $("btnAgain").onclick = ()=>{
-  $("resultSec").hidden=true; preview.hidden=true; $("idle").hidden=false;
-  state.lastQR=""; state.target=""; $("srcTag").textContent="—"; $("srcTag").className="src";
-  quiet(); startCamera();
+  resetScanState();
+  startCamera();
 };
 $("btnManual").onclick = ()=>{ const v=$("cfgManual").value.trim(); if(v) handleQR(v); };
 
