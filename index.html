@@ -794,7 +794,7 @@ async function render(rec, scroll = true){
 /* ============================================================
    9. WIRING
    ============================================================ */
-function applyLang(){
+async function applyLang(){
   const t = T();
   document.documentElement.lang = state.lang;
   $("l_lang").textContent=t.lang; $("l_result").textContent=t.result; $("l_foot").textContent=t.foot;
@@ -806,13 +806,17 @@ function applyLang(){
     b.setAttribute("aria-pressed", on);
     if(on && !applyLang.scrolled){ applyLang.scrolled=true; b.scrollIntoView({inline:"center",block:"nearest"}); }
   });
-  if (state.lastRecord) {render(state.lastRecord);}
+  if (state.lastRecord) 
+  {
+    console.log("render again", state.lang);
+    await render(state.lastRecord);
+  }
 }
 
 LANGS.forEach(l=>{
   const b=document.createElement("button");
   b.className="lang"; b.type="button"; b.dataset.code=l.code; b.textContent=l.label;
-  b.onclick=()=>{ state.lang=l.code; localStorage.setItem("flr.lang",l.code); applyLang(); renderDiag(); };
+  b.onclick = async ()=>{ state.lang=l.code; localStorage.setItem("flr.lang",l.code); await applyLang(); renderDiag(); };
   $("langs").appendChild(b);
 });
 
