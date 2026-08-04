@@ -191,6 +191,7 @@ details.drawer[open]>summary::after{content:"–"}
     <div class="row">
       <button class="btn" id="btnStart">Start camera</button>
       <button class="btn ghost sm" id="btnTorch" hidden>Flash</button>
+      <button class="btn ghost sm" id="btnZoom" hidden>1×</button>
       <button class="btn ghost sm" id="btnStop" hidden>Stop</button>
     </div>
     <div class="row"><button class="btn ghost" id="btnPick">Use a photo instead</button></div>
@@ -256,7 +257,7 @@ details.drawer[open]>summary::after{content:"–"}
    0. CONFIG
    ============================================================ */
 const CFG = {
-  dataEndpoint: "https://foodqr.bigflower-172.workers.dev/foodqr",     // ← 배포 시 워커 URL + /foodqr
+  dataEndpoint: "",     // ← 배포 시 워커 URL + /foodqr
   aiEndpoint:   ""      // ← 배포 시 워커 URL + /translate (선택)
 };
 
@@ -332,7 +333,9 @@ const T = () => UI[state.lang] || UI.en;
    1. STATE / ENV
    ============================================================ */
 const state = { lang:"en", stream:null, track:null, scanning:false, rafId:null,
-                torchOn:false, lastQR:"", target:"" };
+                torchOn:false, lastQR:"", target:"", zoom:1 };
+/* 스캔 계측 — 조용히 실패하지 않게 하려고 둔다 */
+const scan = { frames:0, decodes:0, decoder:"—", err:"", fps:0, res:"", t0:0 };
 const $ = id => document.getElementById(id);
 const video = $("video"), preview = $("preview");
 
@@ -361,11 +364,17 @@ function renderDiag(cam){
     ["data endpoint", dataEp() ? "set" : "not set"],
     ["translator", aiEp() ? "Claude" : "free (gtx)"],
     ["language", state.lang],
+    ["decoder", scan.decoder],
+    ["decode attempts", String(scan.decodes)],
+    ["decode rate", scan.fps ? scan.fps + "/s" : "—"],
+    ["sample size", scan.res || "—"],
+    ["last error", scan.err || "none"],
     ["camera", cam || "idle"],
     ["ua", ENV.ua.slice(0,80)]
   ];
   $("diag").innerHTML = rows.map(([k,v])=>{
-    const cls = (v==="no"||v==="not set") ? "no" : (v==="yes"||v==="native"||v==="set") ? "yes" : "";
+    const cls = (v==="no"||v==="not set"||v==="FAILED") ? "no"
+              : (v==="yes"||v==="native"||v==="set"||v==="jsQR"||v==="BarcodeDetector") ? "yes" : "";
     return `<div><span>${k}</span><span class="${cls}">${esc(v)}</span></div>`;
   }).join("");
 }
@@ -388,7 +397,16 @@ function loadScript(urls){
 let jsQRReady=null;
 const ensureJsQR = () => window.jsQR ? Promise.resolve()
   : (jsQRReady = jsQRReady || loadScript(["https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js",
-                                          "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"]));
+                                          "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js",
+                                          "https://fastly.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"]));
+
+/* jsQR 은 미리 받아둔다. 스캔 시작 시점에 받으면 실패해도 티가 안 난다. */
+function preloadDecoder(){
+  scan.decoder = ENV.barcode ? "BarcodeDetector" : "loading…";
+  ensureJsQR()
+    .then(()=>{ if(!ENV.barcode) scan.decoder = "jsQR"; renderDiag(); })
+    .catch(()=>{ scan.decoder = ENV.barcode ? "BarcodeDetector" : "FAILED"; scan.err = "jsQR CDN blocked"; renderDiag(); });
+}
 
 /* ============================================================
    2. CAMERA
@@ -453,6 +471,12 @@ async function startCamera(){
   $("btnStop").hidden=false; $("btnStart").hidden=true;
   const caps = state.track.getCapabilities ? state.track.getCapabilities() : {};
   $("btnTorch").hidden = !("torch" in caps);
+  $("btnZoom").hidden  = !caps.zoom;
+
+  // 작은 인쇄물이라 연속 초점이 필요하다
+  if(caps.focusMode && caps.focusMode.includes("continuous")){
+    try{ await state.track.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){}
+  }
   const st = state.track.getSettings ? state.track.getSettings() : {};
   renderDiag("running "+(st.width?st.width+"×"+st.height:""));
   say("busy", T().scanning, ""); startQRLoop();
@@ -465,7 +489,8 @@ function stopCamera(){
   state.stream=null; state.track=null; state.torchOn=false;
   video.srcObject=null; video.hidden=true;
   $("reticle").hidden=true; $("badge").hidden=true;
-  $("btnStop").hidden=true; $("btnTorch").hidden=true;
+  $("btnStop").hidden=true; $("btnTorch").hidden=true; $("btnZoom").hidden=true;
+  state.zoom=1; $("btnZoom").textContent="1×";
   $("btnStart").hidden=false; $("btnStart").disabled=false;
   $("idle").hidden=false; renderDiag("stopped");
 }
@@ -483,38 +508,65 @@ async function toggleTorch(){
    3. QR DECODE
    ============================================================ */
 let detector=null;
-async function decodeFrom(source,w,h){
+const _cv = document.createElement("canvas");
+const _cx = _cv.getContext("2d", { willReadFrequently:true });
+
+function jsqrPass(source, sx, sy, sw, sh, out, boost){
+  if(!window.jsQR) return "";
+  _cv.width = out; _cv.height = out;
+  _cx.filter = boost ? "grayscale(1) contrast(2.4) brightness(1.05)" : "none";
+  _cx.drawImage(source, sx, sy, sw, sh, 0, 0, out, out);
+  _cx.filter = "none";
+  const d = _cx.getImageData(0, 0, out, out);
+  const r = window.jsQR(d.data, out, out, { inversionAttempts:"dontInvert" });
+  return r ? r.data : "";
+}
+
+/* 가운데를 원해상도로 먼저 보고, 없으면 전체를 축소해서 본다.
+   푸드QR 은 인쇄가 작아 프레임에서 차지하는 면적이 작다. */
+async function decodeFrom(source, vw, vh){
+  scan.decodes++;
   if(ENV.barcode){
     try{
       if(!detector) detector = new BarcodeDetector({ formats:["qr_code"] });
       const c = await detector.detect(source);
       if(c && c.length) return c[0].rawValue;
-      return "";
-    }catch(e){}
+    }catch(e){ scan.err = "BarcodeDetector: " + (e.message||e).toString().slice(0,40); }
   }
-  await ensureJsQR();
-  const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
-  const ctx=cv.getContext("2d",{willReadFrequently:true});
-  ctx.drawImage(source,0,0,w,h);
-  const img=ctx.getImageData(0,0,w,h);
-  const r=window.jsQR(img.data,w,h,{inversionAttempts:"attemptBoth"});
-  return r ? r.data : "";
+  if(!window.jsQR){ try{ await ensureJsQR(); }catch(e){ scan.err = "jsQR load failed"; return ""; } }
+
+  const side = Math.min(vw, vh) * 0.66;
+  const sx = (vw - side) / 2, sy = (vh - side) / 2;
+  const out = Math.min(1024, Math.round(side));
+  scan.res = out + "px crop";
+
+  let r = jsqrPass(source, sx, sy, side, side, out, false);
+  if(r) return r;
+  r = jsqrPass(source, sx, sy, side, side, out, true);      // 대비 보정
+  if(r) return r;
+  const f = Math.min(900, Math.max(vw, vh));                 // 전체 프레임
+  return jsqrPass(source, 0, 0, vw, vh, f, false);
 }
 function startQRLoop(){
-  state.scanning=true; const MAX=720;
-  const tick = async ()=>{
+  state.scanning = true;
+  scan.frames = 0; scan.decodes = 0; scan.err = ""; scan.t0 = performance.now();
+  let last = 0;
+  const tick = async ts => {
     if(!state.scanning) return;
-    if(video.readyState>=2 && video.videoWidth){
-      const s=Math.min(1,MAX/Math.max(video.videoWidth,video.videoHeight));
-      const w=Math.round(video.videoWidth*s), h=Math.round(video.videoHeight*s);
+    scan.frames++;
+    if(ts - last > 110 && video.readyState >= 2 && video.videoWidth){   // 약 9fps
+      last = ts;
       try{
-        const d = await decodeFrom(video,w,h);
+        const d = await decodeFrom(video, video.videoWidth, video.videoHeight);
         if(d && d !== state.lastQR){
-          state.lastQR=d; state.scanning=false;
+          state.lastQR = d; state.scanning = false;
           if(navigator.vibrate) navigator.vibrate(40);
           stopCamera(); handleQR(d); return;
         }
-      }catch(e){}
+      }catch(e){ scan.err = String(e.message || e).slice(0, 60); }
+      const el = performance.now() - scan.t0;
+      scan.fps = Math.round(scan.decodes / (el / 1000) * 10) / 10;
+      $("badge").textContent = `${scan.decoder} · ${scan.decodes} · ${scan.fps}/s`;
     }
     state.rafId = requestAnimationFrame(tick);
   };
@@ -799,6 +851,32 @@ LANGS.forEach(l=>{
   $("langs").appendChild(b);
 });
 
+/* 화면을 탭하면 그 지점에 초점을 맞춘다 */
+$("stage").addEventListener("click", async ev => {
+  if(!state.track) return;
+  const caps = state.track.getCapabilities ? state.track.getCapabilities() : {};
+  if(!caps.pointsOfInterest && !(caps.focusMode||[]).includes("single-shot")) return;
+  const r = $("stage").getBoundingClientRect();
+  const x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
+  try{
+    await state.track.applyConstraints({ advanced:[{ pointsOfInterest:[{x,y}], focusMode:"single-shot" }] });
+    setTimeout(()=>state.track && state.track.applyConstraints({ advanced:[{ focusMode:"continuous" }] }).catch(()=>{}), 1600);
+  }catch(e){}
+});
+
+/* 줌 — 푸드QR 은 작아서 2배가 크게 도움이 된다 */
+$("btnZoom").onclick = async ()=>{
+  if(!state.track) return;
+  const caps = state.track.getCapabilities();
+  if(!caps.zoom) return;
+  const steps = [1, 2, 3].filter(z => z >= caps.zoom.min && z <= caps.zoom.max);
+  state.zoom = steps[(steps.indexOf(state.zoom) + 1) % steps.length] || 1;
+  try{
+    await state.track.applyConstraints({ advanced:[{ zoom: state.zoom }] });
+    $("btnZoom").textContent = state.zoom + "×";
+  }catch(e){ $("btnZoom").hidden = true; }
+};
+
 $("btnStart").onclick = startCamera;
 $("btnStop").onclick  = stopCamera;
 $("btnTorch").onclick = toggleTorch;
@@ -872,7 +950,7 @@ $("btnDemo").onclick = async ()=>{
   $("cfgData").value = localStorage.getItem("flr.data") || CFG.dataEndpoint;
   $("cfgAi").value   = localStorage.getItem("flr.ai")   || CFG.aiEndpoint;
 
-  applyLang(); renderDiag("idle");
+  applyLang(); preloadDecoder(); renderDiag("idle");
   const blocked = cameraBlockedReason();
   if(blocked){ say("warn", blocked.title, "", blocked.fixes); $("diagDrawer").open = true; }
   window.addEventListener("pagehide", stopCamera);
