@@ -408,6 +408,7 @@ function cameraBlockedReason(){
 }
 
 async function startCamera(){
+  state.lastQR = "";
   quiet(); $("resultSec").hidden = true;
   const blocked = cameraBlockedReason();
   if(blocked){ say("err",blocked.title,"",blocked.fixes); renderDiag("blocked"); return; }
@@ -484,21 +485,25 @@ async function toggleTorch(){
    ============================================================ */
 let detector=null;
 async function decodeFrom(source,w,h){
-  if(ENV.barcode){
-    try{
-      if(!detector) detector = new BarcodeDetector({ formats:["qr_code"] });
-      const c = await detector.detect(source);
-      if(c && c.length) return c[0].rawValue;
-      return "";
-    }catch(e){}
-  }
   await ensureJsQR();
   const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
   const ctx=cv.getContext("2d",{willReadFrequently:true});
   ctx.drawImage(source,0,0,w,h);
   const img=ctx.getImageData(0,0,w,h);
   const r=window.jsQR(img.data,w,h,{inversionAttempts:"attemptBoth"});
-  return r ? r.data : "";
+  
+  if(r) return r.data;
+
+  if(ENV.barcode){
+    try{
+      const detector = new BarcodeDetector({formats: ["qr_code"]});
+      const c = await detector.detect(source);
+      if(c && c.length) return c[0].rawValue;
+      return "";
+    }catch(e){}
+  }
+
+  return "";
 }
 function startQRLoop(){
   state.scanning=true; const MAX=720;
