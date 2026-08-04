@@ -7,30 +7,29 @@
 <meta name="format-detection" content="telephone=no" />
 <title>FOOD LABEL READER</title>
 <meta property="og:title" content="FOOD LABEL READER" />
-<meta property="og:description" content="Scan the FOOD QR. Read the label in your language." />
+<meta property="og:description" content="Scan the FOOD QR. Read a Korean food label in your language." />
 
 <!--
   ============================================================
-  BUILD NOTES  — redirect build
+  FOOD LABEL READER
   ============================================================
-  FLOW
-    언어 선택 → 카메라 → 푸드QR 인식 → 번역 프록시로 이동
-    서버 없음. 키 없음. 파일 하나로 끝.
+  QR 스캔 → 바코드 추출 → 워커(식약처 OpenAPI) → 번역 → 이중언어 렌더
 
-  번역 프록시 주소 형식
-    https://foodqr.kr/01/123
-    → https://foodqr-kr.translate.goog/01/123?_x_tr_sl=ko&_x_tr_tl=en&_x_tr_hl=en
-    호스트에서 '-'는 '--'로, '.'은 '-'로 치환한다.
+  설정: 아래 CFG.dataEndpoint 에 워커 URL 을 넣으면 끝.
+        비워두면 Setup 서랍에서 사용자가 입력할 수 있다(테스트용).
 
-  링크에 언어를 실을 수 있다
-    ?lang=ja 로 열면 일본어가 선택된 상태로 시작.
-    인쇄물마다 다른 QR을 쓰고 싶을 때.
+  푸드QR 은 GS1 Digital Link 다.
+        https://foodqr.kr/01/08800336396509
+        경로의 "01" 은 GTIN 식별자, 그 뒤가 바코드.
 
-  CAMERA
-    getUserMedia는 secure context 전용. https:// 또는 localhost.
-    file:// 과 http://192.168.x.x 는 무조건 실패한다.
-    카카오톡·인스타 인앱 브라우저도 차단 → 사진 업로드로 우회.
-    상태는 하단 Diagnostics에서 확인.
+  원재료(prvwCn)는 배열이 아니라 HTML 한 덩어리로 온다.
+        <a><span>소맥분(<p class="bold">밀:미국산</p>)</span></a>
+        대괄호 [ ] 가 복합원재료의 하위 항목을 나타낸다.
+        Workers 에 DOMParser 가 없어 파싱은 여기서 한다.
+
+  카메라는 secure context 전용. https:// 또는 localhost.
+        file:// 과 http://192.168.x.x 는 무조건 실패.
+        카카오톡·인스타 인앱 브라우저도 차단 → 사진 업로드로 우회.
   ============================================================
 -->
 
@@ -38,40 +37,40 @@
 
 <style>
 :root{
-  --bg:#ffffff; --bg-sub:#f6f7f9;
+  --bg:#fff; --bg-sub:#f6f7f9;
   --ink:#101828; --ink-2:#475467; --ink-3:#98a2b3;
   --line:#e4e7ec; --line-2:#d0d5dd;
   --accent:#0f77e2; --cyan:#00d4ea;
   --ok:#067647; --ok-bg:#ecfdf3;
   --warn:#b54708; --warn-bg:#fffaeb;
   --err:#b42318; --err-bg:#fef3f2;
-  --r:6px;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --r:6px; --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
-body{
-  background:var(--bg);color:var(--ink);
+body{background:var(--bg);color:var(--ink);
   font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
-  font-size:15px;line-height:1.5;letter-spacing:-0.01em;-webkit-font-smoothing:antialiased;
-}
+  font-size:15px;line-height:1.5;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
 button,input{font:inherit;color:inherit}
-[hidden]{display:none !important}
+[hidden]{display:none!important}
 .wrap{width:min(100%,520px);margin:0 auto;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 
 .top{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--line);
   padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
-.mark{width:22px;height:22px;border:1.5px solid var(--ink);border-radius:3px;display:grid;
-  place-items:center;font-size:10px;font-weight:800;letter-spacing:-0.06em;flex:none}
+.mark{width:22px;height:22px;border:1.5px solid var(--ink);border-radius:3px;display:grid;place-items:center;
+  font-size:10px;font-weight:800;letter-spacing:-.06em;flex:none}
 .top h1{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.top .src{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-3);
+  border:1px solid var(--line-2);border-radius:3px;padding:2px 5px}
+.top .src.on{color:var(--ok);border-color:var(--ok)}
 
 section{padding:18px 16px;border-bottom:1px solid var(--line)}
 .lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
 
 .langs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px}
 .langs::-webkit-scrollbar{display:none}
-.lang{flex:none;border:1px solid var(--line-2);background:var(--bg);border-radius:var(--r);
-  padding:7px 11px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.lang{flex:none;border:1px solid var(--line-2);background:var(--bg);border-radius:var(--r);padding:7px 11px;
+  font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
 .lang[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:#fff}
 
 .stage{position:relative;aspect-ratio:3/4;max-height:56vh;background:#0c1015;border:1px solid var(--line);
@@ -92,7 +91,6 @@ section{padding:18px 16px;border-bottom:1px solid var(--line)}
 .btn:active{opacity:.85}
 .btn[disabled]{opacity:.4;cursor:default}
 .btn.ghost{background:var(--bg);color:var(--ink);border-color:var(--line-2)}
-.btn.accent{background:var(--accent);border-color:var(--accent)}
 .btn.sm{padding:9px 10px;font-size:13px;font-weight:600;flex:0 0 auto}
 
 .status{margin-top:10px;border:1px solid var(--line);border-left-width:3px;border-radius:var(--r);
@@ -105,25 +103,51 @@ section{padding:18px 16px;border-bottom:1px solid var(--line)}
 .status .fix{margin:6px 0 0;padding-left:16px;font-size:12.5px}
 .status .fix li{margin:2px 0}
 
-.hit{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--bg-sub)}
-.hit .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
-.hit .u{font-family:var(--mono);font-size:11.5px;word-break:break-all;margin-top:5px;color:var(--ink-2)}
-.count{font-family:var(--mono);font-size:12px;color:var(--ink-3);text-align:center;margin-top:10px}
+.pname{font-size:22px;font-weight:800;line-height:1.25;letter-spacing:-.02em;margin:0}
+.pname .ko{display:block;font-size:12.5px;font-weight:500;color:var(--ink-3);margin-top:3px;letter-spacing:0}
+.block{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--err);color:var(--err);background:var(--err-bg);border-radius:3px;
+  padding:5px 8px;font-size:12.5px;font-weight:700}
+.chip.amber{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+.chip .ko{font-weight:500;color:var(--ink-3);font-size:11px;margin-left:4px}
+.sub{font-size:11.5px;color:var(--ink-3);margin:0 0 8px;line-height:1.45}
 
-.toggle{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;color:var(--ink-2);cursor:pointer}
-.toggle input{width:17px;height:17px;accent-color:var(--ink);flex:none}
+.li{padding:7px 0;border-bottom:1px dotted var(--line)}
+.li:last-child{border-bottom:0}
+.li .tr{font-size:14px;display:flex;align-items:baseline;gap:8px}
+.li .ko{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-top:1px;word-break:break-all}
+.li .org{font-size:11.5px;color:var(--ink-2);margin-top:2px}
+.li[data-d="1"]{padding-left:16px;border-left:1px solid var(--line);margin-left:3px}
+.li[data-d="2"]{padding-left:32px;border-left:1px solid var(--line);margin-left:3px}
+.li.flag .tr{color:var(--err);font-weight:700}
+.li.flag .tr::after{content:"ALLERGEN";margin-left:auto;font-family:var(--mono);font-size:9px;font-weight:700;
+  line-height:1.6;border:1px solid currentColor;border-radius:2px;padding:0 3px;flex:none}
+.li.amber .tr{color:var(--warn);font-weight:700}
+.li.amber .tr::after{content:"CHECK";margin-left:auto;font-family:var(--mono);font-size:9px;font-weight:700;
+  line-height:1.6;border:1px solid currentColor;border-radius:2px;padding:0 3px;flex:none}
+
+table.nut{width:100%;border-collapse:collapse;font-size:13.5px}
+table.nut td{padding:7px 0;border-bottom:1px dotted var(--line)}
+table.nut td:nth-child(2),table.nut td:nth-child(3){text-align:right;font-family:var(--mono);white-space:nowrap}
+table.nut td:nth-child(3){color:var(--ink-3);width:48px}
+table.nut .ko{display:block;font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.para{font-size:13.5px;color:var(--ink-2)}
+.para .ko{display:block;font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-top:3px}
 
 details.drawer{border-top:1px solid var(--line)}
-details.drawer > summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:12px;font-weight:700;
+details.drawer>summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:12px;font-weight:700;
   letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:6px}
-details.drawer > summary::-webkit-details-marker{display:none}
-details.drawer > summary::after{content:"+";margin-left:auto;font-size:15px;color:var(--ink-3)}
-details.drawer[open] > summary::after{content:"–"}
+details.drawer>summary::-webkit-details-marker{display:none}
+details.drawer>summary::after{content:"+";margin-left:auto;font-size:15px;color:var(--ink-3)}
+details.drawer[open]>summary::after{content:"–"}
 .drawer-body{padding:0 16px 18px}
+.field{margin-bottom:12px}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
 .field input{width:100%;border:1px solid var(--line-2);border-radius:var(--r);padding:10px 11px;
   background:var(--bg);font-size:14px;font-family:var(--mono)}
 .field input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.field .note{font-size:11.5px;color:var(--ink-3);margin-top:5px;line-height:1.45}
 .diag{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .diag div{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border-bottom:1px solid var(--line)}
 .diag div:last-child{border-bottom:0}
@@ -141,6 +165,7 @@ details.drawer[open] > summary::after{content:"–"}
   <header class="top">
     <div class="mark">FL</div>
     <h1>Food Label Reader</h1>
+    <span class="src" id="srcTag">—</span>
   </header>
 
   <section>
@@ -168,39 +193,46 @@ details.drawer[open] > summary::after{content:"–"}
       <button class="btn ghost sm" id="btnTorch" hidden>Flash</button>
       <button class="btn ghost sm" id="btnStop" hidden>Stop</button>
     </div>
-    <div class="row">
-      <button class="btn ghost" id="btnPick">Use a photo instead</button>
-    </div>
+    <div class="row"><button class="btn ghost" id="btnPick">Use a photo instead</button></div>
     <input type="file" id="fileCam" accept="image/*" capture="environment" hidden />
     <input type="file" id="filePick" accept="image/*" hidden />
-
-    <label class="toggle"><input type="checkbox" id="autoGo" checked /><span id="l_auto">Open automatically after scanning</span></label>
     <div class="status" id="status" hidden></div>
   </section>
 
-  <section id="hitSec" hidden>
-    <div class="hit">
-      <div class="k" id="l_found">FOOD QR</div>
-      <div class="u" id="hitUrl"></div>
+  <section id="resultSec" hidden>
+    <p class="lbl" id="l_result">Label</p>
+    <div id="result"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn ghost" id="btnAgain">Scan another</button>
+      <button class="btn ghost sm" id="btnOriginal" hidden>Korean page</button>
     </div>
-    <div class="row">
-      <button class="btn accent" id="btnGo">Open in my language</button>
-    </div>
-    <div class="row">
-      <button class="btn ghost sm" id="btnOriginal" style="flex:1">Korean page</button>
-      <button class="btn ghost sm" id="btnAgain" style="flex:1">Scan another</button>
-    </div>
-    <p class="count" id="count" hidden></p>
   </section>
 
   <details class="drawer">
-    <summary>Manual entry</summary>
+    <summary>Setup</summary>
     <div class="drawer-body">
       <div class="field">
-        <label for="manual">Paste a FOOD QR address</label>
-        <input id="manual" type="url" inputmode="url" placeholder="https://foodqr.kr/01/…" autocomplete="off" />
+        <label for="cfgData">Data endpoint</label>
+        <input id="cfgData" type="url" inputmode="url" placeholder="https://your-worker.workers.dev/foodqr" autocomplete="off" />
+        <p class="note">워커의 /foodqr 라우트. 정식 배포 시엔 파일 상단 CFG.dataEndpoint 에 직접 넣는다.</p>
       </div>
-      <div class="row"><button class="btn ghost sm" id="btnManual" style="flex:1">Open</button></div>
+      <div class="field">
+        <label for="cfgAi">Translation endpoint</label>
+        <input id="cfgAi" type="url" inputmode="url" placeholder="https://your-worker.workers.dev/translate" autocomplete="off" />
+        <p class="note">비우면 무료 번역기로 동작한다. 식품 용어 정확도는 떨어진다.</p>
+      </div>
+      <div class="field">
+        <label for="cfgManual">Test with a FOOD QR address</label>
+        <input id="cfgManual" type="url" inputmode="url" placeholder="https://foodqr.kr/01/08800336396509" autocomplete="off" />
+      </div>
+      <div class="row">
+        <button class="btn ghost sm" id="btnManual" style="flex:1">Fetch</button>
+        <button class="btn ghost sm" id="btnDemo" style="flex:1">Demo data</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost sm" id="btnSave" style="flex:1">Save</button>
+        <button class="btn ghost sm" id="btnClear" style="flex:1">Clear</button>
+      </div>
     </div>
   </details>
 
@@ -214,70 +246,110 @@ details.drawer[open] > summary::after{content:"–"}
     </div>
   </details>
 
-  <p class="foot" id="l_foot">
-    Machine translation of the official Korean food-safety page. For allergies or medical restrictions, check the Korean text on the package or ask staff.
-  </p>
+  <p class="foot" id="l_foot"></p>
 </div>
 
 <script>
 "use strict";
 
+/* ============================================================
+   0. CONFIG
+   ============================================================ */
+const CFG = {
+  dataEndpoint: "",     // ← 배포 시 워커 URL + /foodqr
+  aiEndpoint:   ""      // ← 배포 시 워커 URL + /translate (선택)
+};
+
 const LANGS = [
-  { code:"en", label:"English" }, { code:"ja", label:"日本語" },
-  { code:"zh-CN", label:"简体中文" }, { code:"zh-TW", label:"繁體中文" },
-  { code:"vi", label:"Tiếng Việt" }, { code:"th", label:"ไทย" },
-  { code:"id", label:"Indonesia" }, { code:"ru", label:"Русский" },
-  { code:"es", label:"Español" }, { code:"fr", label:"Français" },
-  { code:"de", label:"Deutsch" }, { code:"mn", label:"Монгол" }
+  { code:"en", label:"English", g:"en" }, { code:"ja", label:"日本語", g:"ja" },
+  { code:"zh-CN", label:"简体中文", g:"zh-CN" }, { code:"zh-TW", label:"繁體中文", g:"zh-TW" },
+  { code:"vi", label:"Tiếng Việt", g:"vi" }, { code:"th", label:"ไทย", g:"th" },
+  { code:"id", label:"Indonesia", g:"id" }, { code:"ru", label:"Русский", g:"ru" },
+  { code:"es", label:"Español", g:"es" }, { code:"fr", label:"Français", g:"fr" },
+  { code:"de", label:"Deutsch", g:"de" }, { code:"ko", label:"한국어", g:"ko" }
+];
+const LANG_NAME = { en:"English", ja:"Japanese", "zh-CN":"Simplified Chinese", "zh-TW":"Traditional Chinese",
+  vi:"Vietnamese", th:"Thai", id:"Indonesian", ru:"Russian", es:"Spanish", fr:"French", de:"German", ko:"Korean" };
+
+/* 식약처 알레르기 표시대상 */
+const KR_ALLERGENS = ["알류","계란","달걀","난류","우유","메밀","땅콩","대두","밀","고등어","게","새우",
+  "돼지고기","복숭아","토마토","아황산","호두","닭고기","쇠고기","소고기","오징어","조개","굴","전복","홍합","잣"];
+
+/* 한국 표시대상은 아니지만 EU·미국에서 의무 표시인 것들.
+   외국인 이용자에게는 이쪽이 오히려 중요하다. */
+const INTL_ONLY = [
+  { key:"참깨",     hits:["참깨","참기름"] },
+  { key:"셀러리",   hits:["셀러리"] },
+  { key:"겨자",     hits:["겨자","머스타드","머스터드"] },
+  { key:"루핀",     hits:["루핀"] },
+  { key:"보리·호밀·귀리", hits:["보리","호밀","귀리","맥아"] },
+  { key:"견과류",   hits:["아몬드","캐슈","피스타치오","헤이즐넛","피칸","마카다미아","브라질너트"] },
+  { key:"연체류",   hits:["문어","낙지","조갯살","가리비","바지락"] },
+  { key:"생선",     hits:["멸치","참치","연어","명태","가다랑어","까나리","황태"] }
 ];
 
 const UI = {
-  en:{lang:"Your language",start:"Start camera",stop:"Stop",torch:"Flash",pick:"Use a photo instead",
-      auto:"Open automatically after scanning",found:"FOOD QR",go:"Open in my language",
-      korean:"Korean page",again:"Scan another",
-      idle:"Point the camera at the FOOD QR on the package.",
-      scanning:"Looking for the FOOD QR…",opening:"Opening in {n}…",
-      foot:"Machine translation of the official Korean food-safety page. For allergies or medical restrictions, check the Korean text on the package or ask staff."},
-  ko:{lang:"언어",start:"카메라 켜기",stop:"중지",torch:"플래시",pick:"사진으로 대신하기",
-      auto:"인식되면 자동으로 열기",found:"푸드QR",go:"내 언어로 열기",
-      korean:"원문 페이지",again:"다시 스캔",
-      idle:"포장지의 푸드QR에 카메라를 맞추세요.",
-      scanning:"푸드QR을 찾는 중…",opening:"{n}초 후 이동합니다…",
-      foot:"식품의약품안전처 공식 페이지를 기계 번역합니다. 알레르기나 질환 관련 정보는 포장지의 한국어 원문을 확인하거나 매장 직원에게 문의하세요."},
-  ja:{lang:"言語",start:"カメラを起動",stop:"停止",torch:"ライト",pick:"写真を使う",
-      auto:"読み取ったら自動で開く",found:"FOOD QR",go:"自分の言語で開く",
-      korean:"韓国語ページ",again:"もう一度",
-      idle:"パッケージのFOOD QRにカメラを向けてください。",
-      scanning:"FOOD QRを探しています…",opening:"{n}秒後に移動します…",
-      foot:"韓国食品医薬品安全処の公式ページを機械翻訳します。アレルギーや疾患に関わる情報は韓国語の原文を確認するか店員にお尋ねください。"},
-  "zh-CN":{lang:"语言",start:"开启相机",stop:"停止",torch:"闪光灯",pick:"改用照片",
-      auto:"识别后自动打开",found:"FOOD QR",go:"用我的语言打开",
-      korean:"韩文页面",again:"再扫一次",
-      idle:"将镜头对准包装上的 FOOD QR。",
-      scanning:"正在寻找 FOOD QR…",opening:"{n} 秒后跳转…",
-      foot:"对韩国食品医药品安全处官方页面进行机器翻译。涉及过敏或疾病的信息请核对韩文原文或询问店员。"}
+  en:{lang:"Your language",result:"Label",start:"Start camera",stop:"Stop",torch:"Flash",
+    pick:"Use a photo instead",again:"Scan another",korean:"Korean page",
+    idle:"Point the camera at the FOOD QR on the package.",
+    scanning:"Looking for the FOOD QR…",fetching:"Getting the official record…",translating:"Translating…",
+    official:"Contains",officialSub:"Declared under Korean labelling rules.",
+    intl:"Also present",intlSub:"Not required on Korean labels, but declared in the EU and the US.",
+    ingredients:"Ingredients",nutrition:"Nutrition",storage:"Storage",caution:"Caution",
+    packaging:"Packaging",maker:"Made by",
+    foot:"Machine translation of official data from the Korean Ministry of Food and Drug Safety (FOOD QR). For allergies or medical restrictions, check the Korean text on the package or ask staff."},
+  ko:{lang:"언어",result:"표시사항",start:"카메라 켜기",stop:"중지",torch:"플래시",
+    pick:"사진으로 대신하기",again:"다시 스캔",korean:"원문 페이지",
+    idle:"포장지의 푸드QR에 카메라를 맞추세요.",
+    scanning:"푸드QR을 찾는 중…",fetching:"공식 정보를 가져오는 중…",translating:"번역 중…",
+    official:"알레르기 유발물질",officialSub:"국내 표시기준에 따른 표시사항입니다.",
+    intl:"추가 확인 필요",intlSub:"국내 표시대상은 아니지만 EU·미국에서는 표시 의무 대상입니다.",
+    ingredients:"원재료명",nutrition:"영양정보",storage:"보관방법",caution:"주의사항",
+    packaging:"용기·포장재질",maker:"제조원",
+    foot:"식품의약품안전처 푸드QR 공식 데이터를 기계 번역한 것입니다. 알레르기나 질환 관련 정보는 포장지의 한국어 원문을 확인하거나 매장 직원에게 문의하세요."},
+  ja:{lang:"言語",result:"表示事項",start:"カメラを起動",stop:"停止",torch:"ライト",
+    pick:"写真を使う",again:"もう一度",korean:"韓国語ページ",
+    idle:"パッケージのFOOD QRにカメラを向けてください。",
+    scanning:"FOOD QRを探しています…",fetching:"公式情報を取得中…",translating:"翻訳中…",
+    official:"アレルギー物質",officialSub:"韓国の表示基準に基づく表示です。",
+    intl:"追加確認が必要",intlSub:"韓国では表示義務がありませんが、EU・米国では表示対象です。",
+    ingredients:"原材料",nutrition:"栄養成分",storage:"保存方法",caution:"注意事項",
+    packaging:"容器・包装",maker:"製造元",
+    foot:"韓国食品医薬品安全処のFOOD QR公式データを機械翻訳したものです。アレルギーや疾患に関わる情報は韓国語の原文を確認するか店員にお尋ねください。"},
+  "zh-CN":{lang:"语言",result:"标示事项",start:"开启相机",stop:"停止",torch:"闪光灯",
+    pick:"改用照片",again:"再扫一次",korean:"韩文页面",
+    idle:"将镜头对准包装上的 FOOD QR。",
+    scanning:"正在寻找 FOOD QR…",fetching:"正在获取官方信息…",translating:"翻译中…",
+    official:"致敏物质",officialSub:"依据韩国标示规定的标示内容。",
+    intl:"需额外确认",intlSub:"韩国无需标示，但欧盟与美国为强制标示对象。",
+    ingredients:"配料",nutrition:"营养成分",storage:"保存方法",caution:"注意事项",
+    packaging:"容器包装",maker:"制造商",
+    foot:"本页为韩国食品医药品安全处 FOOD QR 官方数据的机器翻译。涉及过敏或疾病的信息请核对韩文原文或询问店员。"}
 };
 const T = () => UI[state.lang] || UI.en;
 
+/* ============================================================
+   1. STATE / ENV
+   ============================================================ */
 const state = { lang:"en", stream:null, track:null, scanning:false, rafId:null,
-                torchOn:false, lastQR:"", target:"", timer:null };
+                torchOn:false, lastQR:"", target:"" };
 const $ = id => document.getElementById(id);
 const video = $("video"), preview = $("preview");
 
 const ENV = (()=>{
   const ua = navigator.userAgent;
-  const inApp =
-    /KAKAOTALK/i.test(ua) ? "KakaoTalk" : /Instagram/i.test(ua) ? "Instagram" :
-    /NAVER\(inapp/i.test(ua) ? "Naver" : /\bFBAN|\bFBAV/i.test(ua) ? "Facebook" :
-    /Line\//i.test(ua) ? "LINE" : /DaumApps/i.test(ua) ? "Daum" : "";
+  const inApp = /KAKAOTALK/i.test(ua) ? "KakaoTalk" : /Instagram/i.test(ua) ? "Instagram"
+    : /NAVER\(inapp/i.test(ua) ? "Naver" : /\bFBAN|\bFBAV/i.test(ua) ? "Facebook"
+    : /Line\//i.test(ua) ? "LINE" : /DaumApps/i.test(ua) ? "Daum" : "";
   const isFile = location.protocol === "file:";
-  return { isFile, secure: window.isSecureContext === true && !isFile,
-    protocol: location.protocol,
+  return { isFile, secure: window.isSecureContext === true && !isFile, protocol: location.protocol,
     gum: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
     barcode: typeof window.BarcodeDetector !== "undefined", inApp, ua };
 })();
 
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const dataEp = () => ($("cfgData").value || CFG.dataEndpoint || "").trim();
+const aiEp   = () => ($("cfgAi").value   || CFG.aiEndpoint   || "").trim();
 
 function renderDiag(cam){
   const rows = [
@@ -286,41 +358,41 @@ function renderDiag(cam){
     ["getUserMedia", ENV.gum ? "yes" : "no"],
     ["BarcodeDetector", ENV.barcode ? "native" : "jsQR fallback"],
     ["in-app browser", ENV.inApp || "no"],
+    ["data endpoint", dataEp() ? "set" : "not set"],
+    ["translator", aiEp() ? "Claude" : "free (gtx)"],
     ["language", state.lang],
     ["camera", cam || "idle"],
     ["ua", ENV.ua.slice(0,80)]
   ];
   $("diag").innerHTML = rows.map(([k,v])=>{
-    const cls = v==="no" ? "no" : (v==="yes"||v==="native") ? "yes" : "";
+    const cls = (v==="no"||v==="not set") ? "no" : (v==="yes"||v==="native"||v==="set") ? "yes" : "";
     return `<div><span>${k}</span><span class="${cls}">${esc(v)}</span></div>`;
   }).join("");
 }
 function say(kind,title,body,fixes){
-  const el = $("status");
-  el.hidden=false; el.className="status "+kind;
-  el.innerHTML = `<b>${esc(title)}</b>${body?esc(body):""}` +
-    (fixes&&fixes.length ? `<ul class="fix">${fixes.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>` : "");
+  const el=$("status"); el.hidden=false; el.className="status "+kind;
+  el.innerHTML=`<b>${esc(title)}</b>${body?esc(body):""}`+
+    (fixes&&fixes.length?`<ul class="fix">${fixes.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>`:"");
 }
 const quiet = () => { $("status").hidden = true; };
 
 function loadScript(urls){
-  return new Promise((resolve,reject)=>{
-    let i=0;
+  return new Promise((res,rej)=>{ let i=0;
     (function next(){
-      if(i>=urls.length) return reject(new Error("all CDNs failed"));
+      if(i>=urls.length) return rej(new Error("all CDNs failed"));
       const s=document.createElement("script"); s.src=urls[i++]; s.async=true;
-      s.onload=resolve; s.onerror=()=>{ s.remove(); next(); };
-      document.head.appendChild(s);
+      s.onload=res; s.onerror=()=>{s.remove();next();}; document.head.appendChild(s);
     })();
   });
 }
 let jsQRReady=null;
 const ensureJsQR = () => window.jsQR ? Promise.resolve()
-  : (jsQRReady = jsQRReady || loadScript([
-      "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js",
-      "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"]));
+  : (jsQRReady = jsQRReady || loadScript(["https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js",
+                                          "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"]));
 
-/* ---------- camera ---------- */
+/* ============================================================
+   2. CAMERA
+   ============================================================ */
 function cameraBlockedReason(){
   if(!ENV.secure) return { title:"This page is not on a secure connection",
     fixes: ENV.isFile
@@ -328,7 +400,7 @@ function cameraBlockedReason(){
          "GitHub Pages(https://…github.io/…)에 올려서 열 것.",
          "로컬 테스트는 http://localhost 만 허용된다."]
       : ["http:// 주소로는 카메라가 열리지 않는다.","https:// 주소로 다시 접속할 것."] };
-  if(ENV.inApp) return { title: ENV.inApp + " in-app browser blocks the camera",
+  if(ENV.inApp) return { title: ENV.inApp+" in-app browser blocks the camera",
     fixes:["우측 상단 메뉴에서 '다른 브라우저로 열기' 선택",
            "또는 '사진으로 대신하기'를 쓰면 인앱에서도 동작한다."] };
   if(!ENV.gum) return { title:"This browser has no camera API", fixes:["Chrome 또는 Safari 최신 버전에서 열 것."] };
@@ -336,7 +408,7 @@ function cameraBlockedReason(){
 }
 
 async function startCamera(){
-  quiet(); $("hitSec").hidden = true;
+  quiet(); $("resultSec").hidden = true;
   const blocked = cameraBlockedReason();
   if(blocked){ say("err",blocked.title,"",blocked.fixes); renderDiag("blocked"); return; }
 
@@ -350,14 +422,13 @@ async function startCamera(){
     { video:{ facingMode:{ideal:"environment"}, width:{ideal:1280} }, audio:false },
     { video:true, audio:false }
   ];
-  let stream=null, lastErr=null;
-  for(const c of attempts){
-    try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ lastErr=e; }
-  }
+  let stream=null,lastErr=null;
+  for(const c of attempts){ try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ lastErr=e; } }
+
   if(!stream){
-    $("btnStart").disabled = false;
-    const name = (lastErr && lastErr.name) || "";
-    const map = {
+    $("btnStart").disabled=false;
+    const name=(lastErr&&lastErr.name)||"";
+    const map={
       NotAllowedError:["주소창 자물쇠 아이콘 → 카메라 → 허용",
                        "iOS: 설정 → Safari → 카메라 → 확인/허용",
                        "Android: 설정 → 앱 → Chrome → 권한 → 카메라"],
@@ -367,27 +438,24 @@ async function startCamera(){
       SecurityError:["보안 정책으로 차단되었다. https 주소인지 확인할 것."]
     };
     say("err","Camera did not open"+(name?" ("+name+")":""),"",map[name]||["다시 시도하거나 '사진으로 대신하기'를 사용할 것."]);
-    renderDiag("error: "+name);
-    return;
+    renderDiag("error: "+name); return;
   }
 
-  state.stream = stream; state.track = stream.getVideoTracks()[0];
-  video.srcObject = stream;
+  state.stream=stream; state.track=stream.getVideoTracks()[0];
+  video.srcObject=stream;
   try{ await video.play(); }
   catch(e){
     say("warn","Tap the video to start","",["화면을 한 번 터치하면 재생된다."]);
-    $("stage").addEventListener("click", ()=>video.play().catch(()=>{}), { once:true });
+    $("stage").addEventListener("click",()=>video.play().catch(()=>{}),{once:true});
   }
-
   video.hidden=false; preview.hidden=true; $("idle").hidden=true;
   $("reticle").hidden=false; $("badge").hidden=false;
   $("btnStop").hidden=false; $("btnStart").hidden=true;
   const caps = state.track.getCapabilities ? state.track.getCapabilities() : {};
   $("btnTorch").hidden = !("torch" in caps);
   const st = state.track.getSettings ? state.track.getSettings() : {};
-  renderDiag("running " + (st.width ? st.width+"×"+st.height : ""));
-  say("busy", T().scanning, "");
-  startQRLoop();
+  renderDiag("running "+(st.width?st.width+"×"+st.height:""));
+  say("busy", T().scanning, ""); startQRLoop();
 }
 
 function stopCamera(){
@@ -399,27 +467,28 @@ function stopCamera(){
   $("reticle").hidden=true; $("badge").hidden=true;
   $("btnStop").hidden=true; $("btnTorch").hidden=true;
   $("btnStart").hidden=false; $("btnStart").disabled=false;
-  $("idle").hidden=false;
-  renderDiag("stopped");
+  $("idle").hidden=false; renderDiag("stopped");
 }
 async function toggleTorch(){
   if(!state.track) return;
   try{
-    state.torchOn = !state.torchOn;
+    state.torchOn=!state.torchOn;
     await state.track.applyConstraints({ advanced:[{ torch: state.torchOn }] });
     $("btnTorch").style.background = state.torchOn ? "var(--ink)" : "";
     $("btnTorch").style.color = state.torchOn ? "#fff" : "";
   }catch(e){ $("btnTorch").hidden = true; }
 }
 
-/* ---------- decode ---------- */
+/* ============================================================
+   3. QR DECODE
+   ============================================================ */
 let detector=null;
 async function decodeFrom(source,w,h){
   if(ENV.barcode){
     try{
       if(!detector) detector = new BarcodeDetector({ formats:["qr_code"] });
-      const codes = await detector.detect(source);
-      if(codes && codes.length) return codes[0].rawValue;
+      const c = await detector.detect(source);
+      if(c && c.length) return c[0].rawValue;
       return "";
     }catch(e){}
   }
@@ -432,19 +501,18 @@ async function decodeFrom(source,w,h){
   return r ? r.data : "";
 }
 function startQRLoop(){
-  state.scanning = true;
-  const MAX = 720;
+  state.scanning=true; const MAX=720;
   const tick = async ()=>{
     if(!state.scanning) return;
-    if(video.readyState >= 2 && video.videoWidth){
-      const s = Math.min(1, MAX/Math.max(video.videoWidth, video.videoHeight));
-      const w = Math.round(video.videoWidth*s), h = Math.round(video.videoHeight*s);
+    if(video.readyState>=2 && video.videoWidth){
+      const s=Math.min(1,MAX/Math.max(video.videoWidth,video.videoHeight));
+      const w=Math.round(video.videoWidth*s), h=Math.round(video.videoHeight*s);
       try{
-        const data = await decodeFrom(video,w,h);
-        if(data && data !== state.lastQR){
-          state.lastQR = data; state.scanning = false;
+        const d = await decodeFrom(video,w,h);
+        if(d && d !== state.lastQR){
+          state.lastQR=d; state.scanning=false;
           if(navigator.vibrate) navigator.vibrate(40);
-          stopCamera(); handleQR(data); return;
+          stopCamera(); handleQR(d); return;
         }
       }catch(e){}
     }
@@ -460,72 +528,263 @@ function loadImage(file){
   });
 }
 function showPreview(img){
-  const MAX=1400, s=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));
+  const MAX=1400,s=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));
   preview.width=Math.round(img.naturalWidth*s); preview.height=Math.round(img.naturalHeight*s);
   preview.getContext("2d").drawImage(img,0,0,preview.width,preview.height);
   preview.hidden=false; video.hidden=true; $("idle").hidden=true;
 }
 
-/* ---------- redirect ---------- */
+/* ============================================================
+   4. GS1 DIGITAL LINK
+   ============================================================ */
 const isFoodQR = u => { try{ return /(^|\.)foodqr\.kr$/i.test(new URL(u).hostname); }catch(e){ return false; } };
 
-function translatedUrl(u, lang){
-  const x = new URL(u);
-  const host = x.hostname.replace(/-/g,"--").replace(/\./g,"-");
-  const q = new URLSearchParams(x.search);
-  q.set("_x_tr_sl","ko"); q.set("_x_tr_tl",lang); q.set("_x_tr_hl",lang);
-  return "https://" + host + ".translate.goog" + x.pathname + "?" + q.toString();
+function pickBarcode(input){
+  if(!input) return "";
+  const s = String(input).trim();
+  if(/^\d{8,14}$/.test(s)) return s.padStart(14,"0");
+  try{
+    const segs = new URL(s).pathname.split("/").filter(Boolean);
+    const i = segs.indexOf("01");                       // AI 01 = GTIN
+    if(i >= 0 && /^\d{8,14}$/.test(segs[i+1] || "")) return segs[i+1].padStart(14,"0");
+    const d = segs.find(x => /^\d{8,14}$/.test(x));
+    return d ? d.padStart(14,"0") : "";
+  }catch(e){
+    const m = s.match(/\d{8,14}/);
+    return m ? m[0].padStart(14,"0") : "";
+  }
 }
 
-function clearTimer(){ if(state.timer) clearInterval(state.timer); state.timer=null; $("count").hidden=true; }
+/* ============================================================
+   5. 원재료 HTML 파서
+   prvwCn 은 <a><span>이름(<p class="bold">원산지</p>)</span></a> 의 나열이고
+   대괄호 [ ] 가 복합원재료의 하위 항목을 나타낸다.
+   ============================================================ */
+function parseMaterials(html){
+  if(!html) return [];
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const out = []; let depth = 0;
+  const walk = node => {
+    for(const n of [...node.childNodes]){
+      if(n.nodeType === 3){                              // 텍스트: 괄호 깊이만 센다
+        for(const ch of n.nodeValue){
+          if(ch === "[") depth++;
+          else if(ch === "]") depth = Math.max(0, depth-1);
+        }
+      } else if(n.tagName === "A"){
+        const bold = n.querySelector("p.bold, p");
+        const origin = bold ? bold.textContent.replace(/\s+/g," ").trim() : "";
+        const full = n.textContent.replace(/\s+/g," ").trim();
+        const name = origin ? full.replace("("+origin+")","").replace(/\(\s*\)$/,"").trim() : full;
+        let canonical = "";
+        try{
+          const href = n.getAttribute("href") || "";
+          canonical = decodeURIComponent(new URL(href).searchParams.get("query") || "");
+        }catch(e){}
+        if(name) out.push({ depth: Math.min(depth,2), name, origin, canonical });
+      } else walk(n);
+    }
+  };
+  walk(doc.body);
+  return out;
+}
 
-function handleQR(text){
-  clearTimer();
-  if(!/^https?:\/\//i.test(text)){
-    say("warn","This QR is not a web address","",[text.slice(0,120)]);
-    return;
+/* 원재료 한 줄이 어떤 알레르겐에 걸리는지 */
+function classify(m, officialSet){
+  const hay = [m.name, m.origin, m.canonical].join(" ");
+  const kr = KR_ALLERGENS.filter(a => hay.includes(a));
+  const official = kr.some(a => officialSet.has(a));
+  const intl = INTL_ONLY.filter(g => g.hits.some(h => hay.includes(h))).map(g => g.key);
+  return { official: official || kr.length > 0, intl };
+}
+
+/* ============================================================
+   6. DATA + TRANSLATE
+   ============================================================ */
+async function fetchRecord(url){
+  const ep = dataEp();
+  if(!ep) throw new Error("NO_ENDPOINT");
+  const r = await fetch(ep, {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ url, barcode: pickBarcode(url) })
+  });
+  let j = null;
+  try{ j = await r.json(); }catch(e){}
+  if(!r.ok) throw new Error((j && j.error) || ("HTTP "+r.status));
+  return j;
+}
+
+async function gtx(lines, target){
+  if(target === "ko") return lines.slice();
+  const out=[]; let buf=[], len=0;
+  const flush = async ()=>{
+    if(!buf.length) return;
+    const q = buf.join("\n");
+    const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl="+
+      encodeURIComponent(target)+"&dt=t&q="+encodeURIComponent(q);
+    try{
+      const j = await (await fetch(url)).json();
+      const parts = (j[0]||[]).map(s=>s[0]).join("").split("\n");
+      if(parts.length === buf.length) out.push(...parts);
+      else out.push(...buf.map((_,i)=>parts[i]||buf[i]));
+    }catch(e){ out.push(...buf); }
+    buf=[]; len=0;
+  };
+  for(const l of lines){ if(len + l.length > 900) await flush(); buf.push(l); len += l.length+1; }
+  await flush();
+  return out;
+}
+
+async function claude(lines, target){
+  const ep = aiEp();
+  if(!ep || target === "ko") return null;
+  const body = { model:"claude-sonnet-5", max_tokens:2000, messages:[{ role:"user", content:
+`Translate each line of this Korean food label into ${LANG_NAME[target]||target}.
+
+Rules:
+- Return ONLY a JSON array of strings, same length and same order as the input. No fence, no commentary.
+- These are 식품 표시사항 terms. Use the conventional food-labelling wording of the target language, not a literal gloss.
+  e.g. 산도조절제 → acidity regulator, 정제소금 → refined salt, 향미증진제 → flavour enhancer, 아황산류 → sulphites.
+- Keep numbers, units and percentages exactly as printed.
+- Origin strings like "밀:미국산,호주산" become "wheat: USA, Australia".
+
+INPUT:
+${JSON.stringify(lines)}` }] };
+
+  const res = await fetch(ep, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  if(!res.ok) throw new Error("translate HTTP "+res.status);
+  const data = await res.json();
+  const text = (data.content||[]).map(b=>b.type==="text"?b.text:"").join("").trim();
+  const arr = JSON.parse(text.replace(/^```(?:json)?/i,"").replace(/```$/,"").trim());
+  return (Array.isArray(arr) && arr.length === lines.length) ? arr : null;
+}
+
+async function translate(lines, target){
+  if(!lines.length) return [];
+  try{ const a = await claude(lines, target); if(a) return a; }catch(e){}
+  return gtx(lines, LANGS.find(l=>l.code===target)?.g || target);
+}
+
+/* ============================================================
+   7. ORCHESTRATION
+   ============================================================ */
+async function handleQR(text){
+  $("resultSec").hidden = true; quiet();
+  if(!/^https?:\/\//i.test(text) && !/^\d{8,14}$/.test(text.trim())){
+    say("warn","This QR is not a FOOD QR","",[text.slice(0,120)]); return;
   }
   state.target = text.trim();
-  $("hitUrl").textContent = state.target;
-  $("hitSec").hidden = false;
-  $("hitSec").scrollIntoView({ behavior:"smooth", block:"start" });
+  $("btnOriginal").hidden = !/^https?:/i.test(state.target);
+  $("btnOriginal").onclick = ()=> window.open(state.target,"_blank","noopener");
 
-  if(!isFoodQR(state.target)){
-    say("warn","Not a FOOD QR","",
-      ["푸드QR이 아닌 QR이다. 태극마크 + FOOD QR 표기를 확인할 것.","그래도 열려면 아래 버튼을 누를 것."]);
-    return;
+  if(/^https?:/i.test(state.target) && !isFoodQR(state.target)){
+    say("warn","Not a FOOD QR","",["푸드QR이 아닌 QR이다. 태극마크 + FOOD QR 표기를 확인할 것."]); return;
   }
+  const bc = pickBarcode(state.target);
+  if(!bc){ say("err","No barcode in this QR","",[state.target.slice(0,120)]); return; }
+
+  say("busy", T().fetching, "");
+  try{
+    const rec = await fetchRecord(state.target);
+    say("busy", T().translating, "");
+    await render(rec);
+  }catch(e){
+    if(String(e.message) === "NO_ENDPOINT"){
+      say("warn","Data endpoint is not set","",
+        ["Setup 을 열고 워커의 /foodqr 주소를 입력할 것.","'Demo data' 로 화면만 먼저 확인할 수 있다."]);
+      return;
+    }
+    say("err","Could not get the record","",[String(e.message).slice(0,160), "barcode: "+bc]);
+  }
+}
+
+/* ============================================================
+   8. RENDER
+   ============================================================ */
+async function render(rec){
+  const t = T();
+  const mats = parseMaterials(rec.materialHtml);
+  const official = (rec.allergens || []).map(String);
+  const officialSet = new Set(official.flatMap(a => KR_ALLERGENS.filter(k => a.includes(k))));
+
+  // 원재료에서 발견된, 국내 표시대상 밖의 알레르겐
+  const intlFound = [...new Set(mats.flatMap(m => classify(m, officialSet).intl))];
+
+  const nut = rec.nutrition || [];
+
+  /* 번역할 한국어를 한 번에 모아 한 번에 보낸다 */
+  const src = [
+    rec.product || "", rec.maker || "",
+    ...mats.map(m => m.name), ...mats.map(m => m.origin || ""),
+    ...official, ...intlFound,
+    ...nut.map(n => n.name || ""),
+    rec.storage || "", rec.caution || "", rec.packaging || ""
+  ];
+  const tr = await translate(src, state.lang);
+  let i = 0; const take = () => tr[i++] ?? "";
+  const productTr = take(), makerTr = take();
+  const nameTr = mats.map(()=>take());
+  const originTr = mats.map(()=>take());
+  const officialTr = official.map(()=>take());
+  const intlTr = intlFound.map(()=>take());
+  const nutTr = nut.map(()=>take());
+  const storageTr = take(), cautionTr = take(), packagingTr = take();
+
+  const out = [];
+  out.push(`<div class="status ok" style="margin:0 0 14px"><b>Official record</b>${esc(rec.source||"식품의약품안전처 푸드QR")}</div>`);
+  if(rec.product) out.push(`<p class="pname">${esc(productTr)}<span class="ko">${esc(rec.product)}</span></p>`);
+
+  if(official.length){
+    out.push(`<div class="block"><p class="lbl">${esc(t.official)}</p><p class="sub">${esc(t.officialSub)}</p><div class="chips">`+
+      official.map((a,k)=>`<span class="chip">${esc(officialTr[k]||a)}<span class="ko">${esc(a)}</span></span>`).join("")+`</div></div>`);
+  }
+  if(intlFound.length){
+    out.push(`<div class="block"><p class="lbl">${esc(t.intl)}</p><p class="sub">${esc(t.intlSub)}</p><div class="chips">`+
+      intlFound.map((a,k)=>`<span class="chip amber">${esc(intlTr[k]||a)}<span class="ko">${esc(a)}</span></span>`).join("")+`</div></div>`);
+  }
+  if(mats.length){
+    out.push(`<div class="block"><p class="lbl">${esc(t.ingredients)}</p>`+
+      mats.map((m,k)=>{
+        const c = classify(m, officialSet);
+        const cls = c.official ? " flag" : (c.intl.length ? " amber" : "");
+        return `<div class="li${cls}" data-d="${m.depth}">
+          <div class="tr"><span>${esc(nameTr[k]||m.name)}</span></div>
+          <div class="ko">${esc(m.name)}</div>
+          ${m.origin?`<div class="org">${esc(originTr[k]||m.origin)}</div>`:""}
+        </div>`;
+      }).join("")+`</div>`);
+  }
+  if(nut.length){
+    out.push(`<div class="block"><p class="lbl">${esc(t.nutrition)}</p>`+
+      (rec.nutritionBasis?`<p class="sub">${esc(rec.nutritionBasis)}</p>`:"")+
+      `<table class="nut">`+
+      nut.map((n,k)=>`<tr><td>${esc(nutTr[k]||n.name)}<span class="ko">${esc(n.name)}</span></td>
+        <td>${esc(n.value||"")}</td><td>${esc(n.dv||"")}</td></tr>`).join("")+
+      `</table></div>`);
+  }
+  [["storage",rec.storage,storageTr],["caution",rec.caution,cautionTr],
+   ["packaging",rec.packaging,packagingTr],["maker",rec.maker,makerTr]].forEach(([k,ko,v])=>{
+    if(ko) out.push(`<div class="block"><p class="lbl">${esc(t[k])}</p>
+      <p class="para">${esc(v||ko)}<span class="ko">${esc(ko)}</span></p></div>`);
+  });
+
   quiet();
-  if($("autoGo").checked) countdownGo(3);
+  $("result").innerHTML = out.join("");
+  $("srcTag").textContent = "MFDS"; $("srcTag").className = "src on";
+  $("resultSec").hidden = false;
+  $("resultSec").scrollIntoView({ behavior:"smooth", block:"start" });
 }
 
-function countdownGo(n){
-  $("count").hidden = false;
-  const paint = () => { $("count").textContent = T().opening.replace("{n}", n); };
-  paint();
-  state.timer = setInterval(()=>{
-    n--;
-    if(n <= 0){ clearTimer(); go(); return; }
-    paint();
-  }, 1000);
-}
-
-function go(){
-  clearTimer();
-  if(!state.target) return;
-  window.location.assign(isFoodQR(state.target) ? translatedUrl(state.target, state.lang) : state.target);
-}
-
-/* ---------- wiring ---------- */
+/* ============================================================
+   9. WIRING
+   ============================================================ */
 function applyLang(){
   const t = T();
   document.documentElement.lang = state.lang;
-  $("l_lang").textContent=t.lang; $("l_auto").textContent=t.auto;
-  $("l_found").textContent=t.found; $("l_foot").textContent=t.foot;
+  $("l_lang").textContent=t.lang; $("l_result").textContent=t.result; $("l_foot").textContent=t.foot;
   $("btnStart").textContent=t.start; $("btnStop").textContent=t.stop; $("btnTorch").textContent=t.torch;
-  $("btnPick").textContent=t.pick; $("btnGo").textContent=t.go;
-  $("btnOriginal").textContent=t.korean; $("btnAgain").textContent=t.again;
-  $("idle").textContent = t.idle;
+  $("btnPick").textContent=t.pick; $("btnAgain").textContent=t.again; $("btnOriginal").textContent=t.korean;
+  $("idle").textContent=t.idle;
   [...$("langs").children].forEach(b=>{
     const on = b.dataset.code === state.lang;
     b.setAttribute("aria-pressed", on);
@@ -536,59 +795,88 @@ function applyLang(){
 LANGS.forEach(l=>{
   const b=document.createElement("button");
   b.className="lang"; b.type="button"; b.dataset.code=l.code; b.textContent=l.label;
-  b.onclick=()=>{
-    state.lang=l.code; localStorage.setItem("flr.lang",l.code);
-    clearTimer(); applyLang(); renderDiag();
-  };
+  b.onclick=()=>{ state.lang=l.code; localStorage.setItem("flr.lang",l.code); applyLang(); renderDiag(); };
   $("langs").appendChild(b);
 });
 
 $("btnStart").onclick = startCamera;
 $("btnStop").onclick  = stopCamera;
 $("btnTorch").onclick = toggleTorch;
-$("btnGo").onclick    = go;
-$("btnOriginal").onclick = ()=>{ clearTimer(); if(state.target) window.location.assign(state.target); };
-$("btnAgain").onclick = ()=>{
-  clearTimer(); $("hitSec").hidden=true; preview.hidden=true; $("idle").hidden=false;
-  state.lastQR=""; state.target=""; quiet(); startCamera();
-};
-$("autoGo").onchange = e => { if(!e.target.checked) clearTimer(); };
 $("btnPick").onclick  = ()=> (ENV.inApp ? $("fileCam") : $("filePick")).click();
-$("btnManual").onclick = ()=>{
-  const v = $("manual").value.trim();
-  if(v) handleQR(v);
+$("btnAgain").onclick = ()=>{
+  $("resultSec").hidden=true; preview.hidden=true; $("idle").hidden=false;
+  state.lastQR=""; state.target=""; $("srcTag").textContent="—"; $("srcTag").className="src";
+  quiet(); startCamera();
 };
+$("btnManual").onclick = ()=>{ const v=$("cfgManual").value.trim(); if(v) handleQR(v); };
 
 [$("fileCam"),$("filePick")].forEach(inp=>{
   inp.onchange = async e=>{
-    const f = e.target.files && e.target.files[0];
-    e.target.value = "";
+    const f=e.target.files&&e.target.files[0]; e.target.value="";
     if(!f) return;
-    stopCamera(); quiet(); clearTimer();
-    const im = await loadImage(f);
-    showPreview(im);
+    stopCamera(); quiet();
+    const im = await loadImage(f); showPreview(im);
     say("busy", T().scanning, "");
-    const w = Math.min(im.naturalWidth,1400);
-    const h = Math.round(w * im.naturalHeight / im.naturalWidth);
-    const data = await decodeFrom(im, w, h);
-    if(data) handleQR(data);
+    const w=Math.min(im.naturalWidth,1400), h=Math.round(w*im.naturalHeight/im.naturalWidth);
+    const d = await decodeFrom(im,w,h);
+    if(d) handleQR(d);
     else say("warn","No QR code in this photo","",["푸드QR이 화면 가운데 오도록 다시 촬영할 것."]);
   };
 });
+
+$("btnSave").onclick = ()=>{
+  localStorage.setItem("flr.data", $("cfgData").value.trim());
+  localStorage.setItem("flr.ai",   $("cfgAi").value.trim());
+  say("ok","Saved",""); renderDiag(); setTimeout(quiet,1600);
+};
+$("btnClear").onclick = ()=>{
+  ["data","ai"].forEach(k=>localStorage.removeItem("flr."+k));
+  $("cfgData").value=""; $("cfgAi").value="";
+  say("ok","Cleared",""); renderDiag(); setTimeout(quiet,1600);
+};
+
+/* 워커 없이 화면만 확인할 때 쓰는 실제 응답 형태의 샘플 */
+$("btnDemo").onclick = async ()=>{
+  say("busy", T().translating, "");
+  await render({
+    barcode:"08801045121086", product:"오늘밥상 바로 무쳐먹는 파채양념", maker:"주식회사 오뚜기",
+    materialHtml:'<a href="https://terms.naver.com/search.naver?query=설탕"><span>설탕</span></a>, '+
+      '<a href="https://terms.naver.com/search.naver?query=고추장"><span>고추장</span></a>['+
+      '<a href="https://terms.naver.com/search.naver?query=소맥분"><span>소맥분(<p class="bold">밀:미국산,호주산</p>)</span></a>, '+
+      '<a href="https://terms.naver.com/search.naver?query=밀쌀"><span>밀쌀</span></a>], '+
+      '<a href="https://terms.naver.com/search.naver?query=양조간장"><span>양조간장</span></a>['+
+      '<a href="https://terms.naver.com/search.naver?query=양조간장원액"><span>양조간장원액(<p class="bold">탈지대두:인도산</p>)</span></a>, '+
+      '<a href="https://terms.naver.com/search.naver?query=굴농축액"><span>굴농축액</span></a>], '+
+      '<a href="https://terms.naver.com/search.naver?query=참기름"><span>참기름</span></a>, '+
+      '<a href="https://terms.naver.com/search.naver?query=볶은참깨"><span>볶음참깨</span></a>, '+
+      '<a href="https://terms.naver.com/search.naver?query=향미증진제"><span>향미증진제</span></a>',
+    allergens:["대두","밀","조개류(굴)"],
+    nutrition:[{name:"열량",value:"235kcal",dv:""},{name:"나트륨",value:"1270mg",dv:"64%"},
+               {name:"탄수화물",value:"42g",dv:"13%"},{name:"당류",value:"30g",dv:"30%"},
+               {name:"지방",value:"6g",dv:"11%"},{name:"포화지방",value:"2.2g",dv:"15%"},
+               {name:"단백질",value:"3g",dv:"5%"}],
+    nutritionBasis:"총 내용량당 · 90g",
+    storage:"직사광선을 피해 서늘한 곳에 보관하십시오.",
+    packaging:"폴리프로필렌", source:"식품의약품안전처 푸드QR (demo)"
+  });
+};
 
 (function init(){
   const param = new URLSearchParams(location.search).get("lang");
   const saved = localStorage.getItem("flr.lang");
   const nav = navigator.language || "en";
-  const match = c => LANGS.some(l => l.code.toLowerCase() === String(c).toLowerCase());
-  state.lang = match(param) ? param : (saved || (LANGS.find(l =>
+  const has = c => LANGS.some(l => l.code.toLowerCase() === String(c).toLowerCase());
+  state.lang = has(param) ? param : (saved || (LANGS.find(l =>
     nav.toLowerCase().startsWith(l.code.toLowerCase().slice(0,2)))?.code) || "en");
+
+  $("cfgData").value = localStorage.getItem("flr.data") || CFG.dataEndpoint;
+  $("cfgAi").value   = localStorage.getItem("flr.ai")   || CFG.aiEndpoint;
 
   applyLang(); renderDiag("idle");
   const blocked = cameraBlockedReason();
   if(blocked){ say("warn", blocked.title, "", blocked.fixes); $("diagDrawer").open = true; }
   window.addEventListener("pagehide", stopCamera);
-  document.addEventListener("visibilitychange", ()=>{ if(document.hidden){ stopCamera(); clearTimer(); } });
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden) stopCamera(); });
 })();
 </script>
 </body>
