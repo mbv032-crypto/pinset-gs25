@@ -1,1144 +1,595 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#173B8F" />
-  <meta name="description" content="Scan a Korean FOOD QR code and open the official food information page in your language." />
-  <title>GS25 FOOD QR Translator</title>
-
-  <!-- QR decoding runs locally in the browser. No image is uploaded by this page. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-
-  <style>
-    :root {
-      --gs-navy: #173b8f;
-      --gs-blue: #2854e8;
-      --gs-cyan: #00c7e8;
-      --ink: #13203a;
-      --muted: #667085;
-      --line: #d9e2f0;
-      --surface: #ffffff;
-      --soft: #f3f7ff;
-      --success: #117a52;
-      --warning: #9b5c00;
-      --danger: #b42318;
-      --radius-xl: 28px;
-      --radius-lg: 20px;
-      --shadow: 0 20px 60px rgba(23, 59, 143, 0.14);
-    }
-
-    * { box-sizing: border-box; }
-
-    html { background: #eaf1ff; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 8% 0%, rgba(0, 199, 232, 0.25), transparent 28rem),
-        radial-gradient(circle at 100% 15%, rgba(40, 84, 232, 0.22), transparent 30rem),
-        linear-gradient(180deg, #f9fbff 0%, #edf4ff 100%);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Noto Sans", Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    button, input, select { font: inherit; }
-    button { -webkit-tap-highlight-color: transparent; }
-
-    .page {
-      width: min(100%, 540px);
-      min-height: 100vh;
-      margin: 0 auto;
-      padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
-    }
-
-    .brandbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--gs-navy);
-      font-size: 14px;
-      font-weight: 900;
-      letter-spacing: -0.02em;
-    }
-
-    .brand-mark {
-      display: grid;
-      place-items: center;
-      width: 50px;
-      height: 32px;
-      color: white;
-      background: linear-gradient(135deg, var(--gs-blue), var(--gs-cyan));
-      border-radius: 11px;
-      box-shadow: 0 8px 18px rgba(40, 84, 232, 0.23);
-      font-size: 14px;
-      font-weight: 950;
-      letter-spacing: -0.06em;
-    }
-
-    .privacy-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 11px;
-      color: var(--success);
-      background: #eafaf3;
-      border: 1px solid #c8efdf;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .hero {
-      overflow: hidden;
-      position: relative;
-      padding: 27px 23px 25px;
-      color: white;
-      background: linear-gradient(145deg, #163b91 0%, #2556e4 58%, #00bcd8 135%);
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow);
-    }
-
-    .hero::before,
-    .hero::after {
-      content: "";
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-    }
-
-    .hero::before {
-      width: 190px;
-      height: 190px;
-      right: -77px;
-      top: -82px;
-      border: 30px solid rgba(255, 255, 255, 0.11);
-    }
-
-    .hero::after {
-      width: 82px;
-      height: 82px;
-      right: 27px;
-      bottom: -51px;
-      background: rgba(255, 255, 255, 0.10);
-    }
-
-    .eyebrow {
-      position: relative;
-      z-index: 1;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      margin-bottom: 13px;
-      font-size: 12px;
-      font-weight: 850;
-      letter-spacing: 0.03em;
-      opacity: 0.88;
-    }
-
-    .hero h1 {
-      position: relative;
-      z-index: 1;
-      max-width: 395px;
-      margin: 0;
-      font-size: clamp(30px, 8vw, 43px);
-      line-height: 1.06;
-      letter-spacing: -0.055em;
-    }
-
-    .hero p {
-      position: relative;
-      z-index: 1;
-      max-width: 390px;
-      margin: 15px 0 0;
-      color: rgba(255, 255, 255, 0.86);
-      font-size: 14px;
-      line-height: 1.55;
-      word-break: keep-all;
-    }
-
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin: 18px 0;
-    }
-
-    .step {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 39px;
-      padding: 8px;
-      color: #78849b;
-      background: rgba(255, 255, 255, 0.72);
-      border: 1px solid rgba(217, 226, 240, 0.88);
-      border-radius: 13px;
-      font-size: 11px;
-      font-weight: 850;
-      text-align: center;
-    }
-
-    .step.active {
-      color: var(--gs-navy);
-      background: white;
-      border-color: #a9c4ff;
-      box-shadow: 0 8px 24px rgba(23, 59, 143, 0.09);
-    }
-
-    .card {
-      padding: 21px;
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(217, 226, 240, 0.92);
-      border-radius: var(--radius-lg);
-      box-shadow: 0 12px 34px rgba(23, 59, 143, 0.08);
-    }
-
-    .card + .card { margin-top: 13px; }
-
-    .card-title {
-      margin: 0 0 7px;
-      font-size: 19px;
-      line-height: 1.25;
-      letter-spacing: -0.035em;
-    }
-
-    .card-desc {
-      margin: 0 0 17px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-      word-break: keep-all;
-    }
-
-    .language-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 9px;
-    }
-
-    .lang-btn {
-      min-height: 66px;
-      padding: 11px 12px;
-      color: var(--ink);
-      background: white;
-      border: 1.5px solid var(--line);
-      border-radius: 16px;
-      text-align: left;
-      cursor: pointer;
-      transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
-    }
-
-    .lang-btn:hover { transform: translateY(-1px); }
-    .lang-btn:focus-visible { outline: 3px solid rgba(0, 199, 232, 0.35); outline-offset: 2px; }
-
-    .lang-btn.selected {
-      color: var(--gs-navy);
-      border-color: var(--gs-blue);
-      background: linear-gradient(180deg, #ffffff, #edf4ff);
-      box-shadow: 0 9px 21px rgba(40, 84, 232, 0.13);
-    }
-
-    .lang-native {
-      display: block;
-      font-size: 15px;
-      font-weight: 900;
-      line-height: 1.15;
-    }
-
-    .lang-sub {
-      display: block;
-      margin-top: 5px;
-      color: #7a879c;
-      font-size: 10px;
-      font-weight: 700;
-    }
-
-    .action-stack { display: grid; gap: 10px; }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 9px;
-      width: 100%;
-      min-height: 54px;
-      padding: 13px 17px;
-      border: 0;
-      border-radius: 15px;
-      font-weight: 900;
-      cursor: pointer;
-      text-decoration: none;
-      transition: transform 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
-    }
-
-    .btn:hover { transform: translateY(-1px); }
-    .btn:active { transform: translateY(0); }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-    .btn:focus-visible { outline: 3px solid rgba(0, 199, 232, 0.38); outline-offset: 2px; }
-
-    .btn-primary {
-      color: white;
-      background: linear-gradient(135deg, var(--gs-blue), #1643c7);
-      box-shadow: 0 12px 24px rgba(40, 84, 232, 0.24);
-    }
-
-    .btn-cyan {
-      color: #073d56;
-      background: linear-gradient(135deg, #70e8f8, var(--gs-cyan));
-      box-shadow: 0 12px 24px rgba(0, 199, 232, 0.18);
-    }
-
-    .btn-secondary {
-      color: var(--gs-navy);
-      background: var(--soft);
-      border: 1px solid #cbdafd;
-    }
-
-    .btn-ghost {
-      min-height: 45px;
-      color: #56627a;
-      background: white;
-      border: 1px solid var(--line);
-      box-shadow: none;
-    }
-
-    .icon {
-      width: 21px;
-      height: 21px;
-      flex: 0 0 auto;
-    }
-
-    #fileInput { display: none; }
-
-    .scanner-wrap {
-      overflow: hidden;
-      margin: 4px 0 14px;
-      background: #06112a;
-      border: 4px solid white;
-      border-radius: 20px;
-      box-shadow: 0 11px 30px rgba(5, 18, 48, 0.21);
-    }
-
-    #reader {
-      width: 100%;
-      min-height: 250px;
-      background: #06112a;
-    }
-
-    #reader video,
-    #reader img,
-    #reader canvas { border-radius: 15px !important; }
-
-    .scan-guide {
-      display: flex;
-      align-items: flex-start;
-      gap: 9px;
-      margin: 0 0 14px;
-      padding: 11px 12px;
-      color: #3e526f;
-      background: #eef8ff;
-      border: 1px solid #cce9fa;
-      border-radius: 13px;
-      font-size: 12px;
-      line-height: 1.45;
-    }
-
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 13px;
-      padding: 12px 2px 0;
-      border-top: 1px solid #edf0f5;
-      color: #4d5b72;
-      font-size: 12px;
-      font-weight: 750;
-    }
-
-    .switch {
-      position: relative;
-      width: 48px;
-      height: 28px;
-      flex: 0 0 auto;
-    }
-
-    .switch input { opacity: 0; width: 0; height: 0; }
-
-    .slider {
-      position: absolute;
-      inset: 0;
-      background: #c8d0dd;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .slider::before {
-      content: "";
-      position: absolute;
-      width: 22px;
-      height: 22px;
-      left: 3px;
-      top: 3px;
-      background: white;
-      border-radius: 50%;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      transition: 0.2s;
-    }
-
-    .switch input:checked + .slider { background: var(--gs-blue); }
-    .switch input:checked + .slider::before { transform: translateX(20px); }
-
-    .manual {
-      margin-top: 14px;
-      padding-top: 13px;
-      border-top: 1px dashed #d9e2ef;
-    }
-
-    .manual summary {
-      color: #5a6780;
-      font-size: 12px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-
-    .manual-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .url-input {
-      min-width: 0;
-      flex: 1;
-      height: 46px;
-      padding: 0 12px;
-      color: var(--ink);
-      background: white;
-      border: 1px solid #cfd9e8;
-      border-radius: 12px;
-      outline: none;
-    }
-
-    .url-input:focus { border-color: var(--gs-blue); box-shadow: 0 0 0 3px rgba(40,84,232,0.1); }
-
-    .mini-btn {
-      flex: 0 0 auto;
-      padding: 0 14px;
-      color: white;
-      background: var(--gs-navy);
-      border: 0;
-      border-radius: 12px;
-      font-weight: 850;
-      cursor: pointer;
-    }
-
-    .result-box {
-      padding: 15px;
-      background: #f7faff;
-      border: 1px solid #d8e4f7;
-      border-radius: 15px;
-    }
-
-    .result-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 11px;
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    .result-status.ok { color: var(--success); }
-    .result-status.warn { color: var(--warning); }
-
-    .decoded {
-      overflow-wrap: anywhere;
-      margin: 0;
-      padding: 11px;
-      color: #34425c;
-      background: white;
-      border: 1px solid #e1e7f0;
-      border-radius: 11px;
-      font: 11px/1.48 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    }
-
-    .redirect-note {
-      margin: 11px 0 0;
-      color: #637087;
-      font-size: 11px;
-      line-height: 1.45;
-    }
-
-    .notice {
-      display: flex;
-      gap: 9px;
-      margin-top: 13px;
-      padding: 12px 13px;
-      color: #66511d;
-      background: #fff8e7;
-      border: 1px solid #f5df9d;
-      border-radius: 13px;
-      font-size: 11px;
-      line-height: 1.48;
-      word-break: keep-all;
-    }
-
-    .error {
-      display: none;
-      margin: 12px 0 0;
-      padding: 12px 13px;
-      color: var(--danger);
-      background: #fff1f0;
-      border: 1px solid #f4c7c3;
-      border-radius: 13px;
-      font-size: 12px;
-      line-height: 1.45;
-    }
-
-    .footer {
-      padding: 19px 10px 0;
-      color: #748198;
-      font-size: 10px;
-      line-height: 1.55;
-      text-align: center;
-    }
-
-    .hidden { display: none !important; }
-
-    [dir="rtl"] .lang-btn,
-    [dir="rtl"] .card,
-    [dir="rtl"] .hero { text-align: right; }
-
-    [dir="rtl"] .manual-row { direction: rtl; }
-
-    @media (max-width: 360px) {
-      .page { padding-left: 12px; padding-right: 12px; }
-      .hero { padding: 23px 19px; }
-      .card { padding: 17px; }
-      .language-grid { grid-template-columns: 1fr; }
-      .privacy-pill { display: none; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="format-detection" content="telephone=no" />
+<title>FOOD LABEL READER</title>
+<meta property="og:title" content="FOOD LABEL READER" />
+<meta property="og:description" content="Scan the FOOD QR. Read the label in your language." />
+
+<!--
+  ============================================================
+  BUILD NOTES  — redirect build
+  ============================================================
+  FLOW
+    언어 선택 → 카메라 → 푸드QR 인식 → 번역 프록시로 이동
+    서버 없음. 키 없음. 파일 하나로 끝.
+
+  번역 프록시 주소 형식
+    https://foodqr.kr/01/123
+    → https://foodqr-kr.translate.goog/01/123?_x_tr_sl=ko&_x_tr_tl=en&_x_tr_hl=en
+    호스트에서 '-'는 '--'로, '.'은 '-'로 치환한다.
+
+  링크에 언어를 실을 수 있다
+    ?lang=ja 로 열면 일본어가 선택된 상태로 시작.
+    인쇄물마다 다른 QR을 쓰고 싶을 때.
+
+  CAMERA
+    getUserMedia는 secure context 전용. https:// 또는 localhost.
+    file:// 과 http://192.168.x.x 는 무조건 실패한다.
+    카카오톡·인스타 인앱 브라우저도 차단 → 사진 업로드로 우회.
+    상태는 하단 Diagnostics에서 확인.
+  ============================================================
+-->
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f6f7f9;
+  --ink:#101828; --ink-2:#475467; --ink-3:#98a2b3;
+  --line:#e4e7ec; --line-2:#d0d5dd;
+  --accent:#0f77e2; --cyan:#00d4ea;
+  --ok:#067647; --ok-bg:#ecfdf3;
+  --warn:#b54708; --warn-bg:#fffaeb;
+  --err:#b42318; --err-bg:#fef3f2;
+  --r:6px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
+  font-size:15px;line-height:1.5;letter-spacing:-0.01em;-webkit-font-smoothing:antialiased;
+}
+button,input{font:inherit;color:inherit}
+[hidden]{display:none !important}
+.wrap{width:min(100%,520px);margin:0 auto;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+
+.top{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:10px}
+.mark{width:22px;height:22px;border:1.5px solid var(--ink);border-radius:3px;display:grid;
+  place-items:center;font-size:10px;font-weight:800;letter-spacing:-0.06em;flex:none}
+.top h1{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+
+section{padding:18px 16px;border-bottom:1px solid var(--line)}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
+
+.langs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px}
+.langs::-webkit-scrollbar{display:none}
+.lang{flex:none;border:1px solid var(--line-2);background:var(--bg);border-radius:var(--r);
+  padding:7px 11px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.lang[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:#fff}
+
+.stage{position:relative;aspect-ratio:3/4;max-height:56vh;background:#0c1015;border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;display:grid;place-items:center}
+.stage video,.stage canvas.preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#0c1015}
+.stage .idle{color:#68727f;font-size:12.5px;text-align:center;padding:0 28px;line-height:1.6;z-index:1}
+.reticle{position:absolute;inset:0;pointer-events:none}
+.scanline{position:absolute;left:14%;right:14%;height:1px;background:var(--cyan);opacity:.9;
+  box-shadow:0 0 6px var(--cyan);animation:sweep 2.6s ease-in-out infinite}
+@keyframes sweep{0%,100%{top:22%}50%{top:76%}}
+@media (prefers-reduced-motion:reduce){.scanline{animation:none;top:50%}}
+.badge{position:absolute;left:10px;top:10px;z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  color:#cfe9ff;background:rgba(12,16,21,.72);border:1px solid rgba(255,255,255,.16);border-radius:3px;padding:3px 6px}
+
+.row{display:flex;gap:8px;margin-top:10px}
+.btn{flex:1;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:var(--r);
+  padding:12px 10px;font-size:14px;font-weight:700;cursor:pointer}
+.btn:active{opacity:.85}
+.btn[disabled]{opacity:.4;cursor:default}
+.btn.ghost{background:var(--bg);color:var(--ink);border-color:var(--line-2)}
+.btn.accent{background:var(--accent);border-color:var(--accent)}
+.btn.sm{padding:9px 10px;font-size:13px;font-weight:600;flex:0 0 auto}
+
+.status{margin-top:10px;border:1px solid var(--line);border-left-width:3px;border-radius:var(--r);
+  padding:10px 12px;font-size:13px;background:var(--bg-sub);color:var(--ink-2)}
+.status.ok{border-left-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.status.warn{border-left-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
+.status.err{border-left-color:var(--err);background:var(--err-bg);color:var(--err)}
+.status.busy{border-left-color:var(--accent)}
+.status b{display:block;margin-bottom:2px}
+.status .fix{margin:6px 0 0;padding-left:16px;font-size:12.5px}
+.status .fix li{margin:2px 0}
+
+.hit{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--bg-sub)}
+.hit .k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.hit .u{font-family:var(--mono);font-size:11.5px;word-break:break-all;margin-top:5px;color:var(--ink-2)}
+.count{font-family:var(--mono);font-size:12px;color:var(--ink-3);text-align:center;margin-top:10px}
+
+.toggle{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.toggle input{width:17px;height:17px;accent-color:var(--ink);flex:none}
+
+details.drawer{border-top:1px solid var(--line)}
+details.drawer > summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:12px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+details.drawer > summary::-webkit-details-marker{display:none}
+details.drawer > summary::after{content:"+";margin-left:auto;font-size:15px;color:var(--ink-3)}
+details.drawer[open] > summary::after{content:"–"}
+.drawer-body{padding:0 16px 18px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+.field input{width:100%;border:1px solid var(--line-2);border-radius:var(--r);padding:10px 11px;
+  background:var(--bg);font-size:14px;font-family:var(--mono)}
+.field input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.diag{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.diag div{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border-bottom:1px solid var(--line)}
+.diag div:last-child{border-bottom:0}
+.diag span:first-child{color:var(--ink-3)}
+.diag span:last-child{text-align:right;word-break:break-all}
+.diag .no{color:var(--err);font-weight:700}
+.diag .yes{color:var(--ok);font-weight:700}
+.foot{padding:16px;font-size:11.5px;color:var(--ink-3);line-height:1.6}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
 </head>
 <body>
-  <main class="page">
-    <div class="brandbar">
-      <div class="brand" aria-label="GS25 FOOD QR Translator">
-        <span class="brand-mark">GS25</span>
-        <span>FOOD QR TRANSLATOR</span>
+<div class="wrap">
+
+  <header class="top">
+    <div class="mark">FL</div>
+    <h1>Food Label Reader</h1>
+  </header>
+
+  <section>
+    <p class="lbl" id="l_lang">Your language</p>
+    <div class="langs" id="langs" role="group"></div>
+  </section>
+
+  <section>
+    <div class="stage" id="stage">
+      <video id="video" playsinline muted autoplay hidden></video>
+      <canvas class="preview" id="preview" hidden></canvas>
+      <div class="idle" id="idle">Camera off</div>
+      <div class="reticle" id="reticle" hidden>
+        <svg viewBox="0 0 300 400" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M42 96 V70 H72 M228 70 H258 V96 M258 304 V330 H228 M72 330 H42 V304"
+                fill="none" stroke="#00d4ea" stroke-width="2" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <div class="scanline"></div>
       </div>
-      <span class="privacy-pill" id="privacyPill">● Image stays on device</span>
+      <div class="badge" id="badge" hidden>LIVE</div>
     </div>
 
-    <section class="hero" aria-labelledby="mainTitle">
-      <div class="eyebrow" id="eyebrow">KOREAN FOOD INFO, IN YOUR LANGUAGE</div>
-      <h1 id="mainTitle">Scan once.<br />Understand what you eat.</h1>
-      <p id="heroDesc">Scan the FOOD QR printed on a Korean product package. The official food information page opens in your selected language.</p>
-    </section>
+    <div class="row">
+      <button class="btn" id="btnStart">Start camera</button>
+      <button class="btn ghost sm" id="btnTorch" hidden>Flash</button>
+      <button class="btn ghost sm" id="btnStop" hidden>Stop</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="btnPick">Use a photo instead</button>
+    </div>
+    <input type="file" id="fileCam" accept="image/*" capture="environment" hidden />
+    <input type="file" id="filePick" accept="image/*" hidden />
 
-    <nav class="steps" aria-label="Progress">
-      <div class="step active" id="step1">1. Language</div>
-      <div class="step" id="step2">2. Scan</div>
-      <div class="step" id="step3">3. Translate</div>
-    </nav>
+    <label class="toggle"><input type="checkbox" id="autoGo" checked /><span id="l_auto">Open automatically after scanning</span></label>
+    <div class="status" id="status" hidden></div>
+  </section>
 
-    <section class="card" id="languageCard">
-      <h2 class="card-title" id="languageTitle">Choose your language</h2>
-      <p class="card-desc" id="languageDesc">The interface and translated food page will use this language.</p>
-      <div class="language-grid" role="radiogroup" aria-label="Target language">
-        <button class="lang-btn selected" type="button" data-lang="en" role="radio" aria-checked="true">
-          <span class="lang-native">English</span>
-          <span class="lang-sub">영어</span>
-        </button>
-        <button class="lang-btn" type="button" data-lang="ja" role="radio" aria-checked="false">
-          <span class="lang-native">日本語</span>
-          <span class="lang-sub">일본어</span>
-        </button>
-        <button class="lang-btn" type="button" data-lang="zh-CN" role="radio" aria-checked="false">
-          <span class="lang-native">简体中文</span>
-          <span class="lang-sub">중국어 간체</span>
-        </button>
-        <button class="lang-btn" type="button" data-lang="es" role="radio" aria-checked="false">
-          <span class="lang-native">Español</span>
-          <span class="lang-sub">스페인어</span>
-        </button>
-        <button class="lang-btn" type="button" data-lang="ar" role="radio" aria-checked="false">
-          <span class="lang-native">العربية</span>
-          <span class="lang-sub">아랍어</span>
-        </button>
+  <section id="hitSec" hidden>
+    <div class="hit">
+      <div class="k" id="l_found">FOOD QR</div>
+      <div class="u" id="hitUrl"></div>
+    </div>
+    <div class="row">
+      <button class="btn accent" id="btnGo">Open in my language</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost sm" id="btnOriginal" style="flex:1">Korean page</button>
+      <button class="btn ghost sm" id="btnAgain" style="flex:1">Scan another</button>
+    </div>
+    <p class="count" id="count" hidden></p>
+  </section>
+
+  <details class="drawer">
+    <summary>Manual entry</summary>
+    <div class="drawer-body">
+      <div class="field">
+        <label for="manual">Paste a FOOD QR address</label>
+        <input id="manual" type="url" inputmode="url" placeholder="https://foodqr.kr/01/…" autocomplete="off" />
       </div>
-    </section>
+      <div class="row"><button class="btn ghost sm" id="btnManual" style="flex:1">Open</button></div>
+    </div>
+  </details>
 
-    <section class="card" id="scanCard">
-      <h2 class="card-title" id="scanTitle">Scan the FOOD QR</h2>
-      <p class="card-desc" id="scanDesc">Point your camera at the QR code, or upload a clear photo containing it.</p>
+  <details class="drawer" id="diagDrawer">
+    <summary>Diagnostics</summary>
+    <div class="drawer-body">
+      <div class="diag" id="diag"></div>
+      <p style="font-size:11.5px;color:var(--ink-3);margin-top:10px;line-height:1.5">
+        secure context가 no면 어떤 코드로도 카메라는 열리지 않는다. https 주소로 접속할 것.
+      </p>
+    </div>
+  </details>
 
-      <div class="scan-guide" id="scanGuide">
-        <span aria-hidden="true">◎</span>
-        <span id="scanGuideText">Use the QR labeled “FOOD QR” on the package, not the product barcode.</span>
-      </div>
+  <p class="foot" id="l_foot">
+    Machine translation of the official Korean food-safety page. For allergies or medical restrictions, check the Korean text on the package or ask staff.
+  </p>
+</div>
 
-      <div class="scanner-wrap hidden" id="scannerWrap">
-        <div id="reader" aria-label="QR scanner camera view"></div>
-      </div>
+<script>
+"use strict";
 
-      <div class="action-stack">
-        <button class="btn btn-primary" type="button" id="cameraButton">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8.4 5.3 9.6 3.7h4.8l1.2 1.6H19a2 2 0 0 1 2 2v10.2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.3a2 2 0 0 1 2-2h3.4Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="12.3" r="3.8" stroke="currentColor" stroke-width="1.9"/></svg>
-          <span id="cameraButtonText">Scan with camera</span>
-        </button>
+const LANGS = [
+  { code:"en", label:"English" }, { code:"ja", label:"日本語" },
+  { code:"zh-CN", label:"简体中文" }, { code:"zh-TW", label:"繁體中文" },
+  { code:"vi", label:"Tiếng Việt" }, { code:"th", label:"ไทย" },
+  { code:"id", label:"Indonesia" }, { code:"ru", label:"Русский" },
+  { code:"es", label:"Español" }, { code:"fr", label:"Français" },
+  { code:"de", label:"Deutsch" }, { code:"mn", label:"Монгол" }
+];
 
-        <button class="btn btn-cyan" type="button" id="uploadButton">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 16.5V19a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-2.5M12 16V3.5m0 0L7.5 8M12 3.5 16.5 8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span id="uploadButtonText">Upload a QR photo</span>
-        </button>
-        <input id="fileInput" type="file" accept="image/*" />
+const UI = {
+  en:{lang:"Your language",start:"Start camera",stop:"Stop",torch:"Flash",pick:"Use a photo instead",
+      auto:"Open automatically after scanning",found:"FOOD QR",go:"Open in my language",
+      korean:"Korean page",again:"Scan another",
+      idle:"Point the camera at the FOOD QR on the package.",
+      scanning:"Looking for the FOOD QR…",opening:"Opening in {n}…",
+      foot:"Machine translation of the official Korean food-safety page. For allergies or medical restrictions, check the Korean text on the package or ask staff."},
+  ko:{lang:"언어",start:"카메라 켜기",stop:"중지",torch:"플래시",pick:"사진으로 대신하기",
+      auto:"인식되면 자동으로 열기",found:"푸드QR",go:"내 언어로 열기",
+      korean:"원문 페이지",again:"다시 스캔",
+      idle:"포장지의 푸드QR에 카메라를 맞추세요.",
+      scanning:"푸드QR을 찾는 중…",opening:"{n}초 후 이동합니다…",
+      foot:"식품의약품안전처 공식 페이지를 기계 번역합니다. 알레르기나 질환 관련 정보는 포장지의 한국어 원문을 확인하거나 매장 직원에게 문의하세요."},
+  ja:{lang:"言語",start:"カメラを起動",stop:"停止",torch:"ライト",pick:"写真を使う",
+      auto:"読み取ったら自動で開く",found:"FOOD QR",go:"自分の言語で開く",
+      korean:"韓国語ページ",again:"もう一度",
+      idle:"パッケージのFOOD QRにカメラを向けてください。",
+      scanning:"FOOD QRを探しています…",opening:"{n}秒後に移動します…",
+      foot:"韓国食品医薬品安全処の公式ページを機械翻訳します。アレルギーや疾患に関わる情報は韓国語の原文を確認するか店員にお尋ねください。"},
+  "zh-CN":{lang:"语言",start:"开启相机",stop:"停止",torch:"闪光灯",pick:"改用照片",
+      auto:"识别后自动打开",found:"FOOD QR",go:"用我的语言打开",
+      korean:"韩文页面",again:"再扫一次",
+      idle:"将镜头对准包装上的 FOOD QR。",
+      scanning:"正在寻找 FOOD QR…",opening:"{n} 秒后跳转…",
+      foot:"对韩国食品医药品安全处官方页面进行机器翻译。涉及过敏或疾病的信息请核对韩文原文或询问店员。"}
+};
+const T = () => UI[state.lang] || UI.en;
 
-        <button class="btn btn-ghost hidden" type="button" id="stopButton">
-          <span id="stopButtonText">Stop camera</span>
-        </button>
-      </div>
+const state = { lang:"en", stream:null, track:null, scanning:false, rafId:null,
+                torchOn:false, lastQR:"", target:"", timer:null };
+const $ = id => document.getElementById(id);
+const video = $("video"), preview = $("preview");
 
-      <div class="toggle-row">
-        <label for="autoOpen" id="autoOpenLabel">Open translation automatically after scanning</label>
-        <label class="switch">
-          <input type="checkbox" id="autoOpen" checked />
-          <span class="slider"></span>
-        </label>
-      </div>
+const ENV = (()=>{
+  const ua = navigator.userAgent;
+  const inApp =
+    /KAKAOTALK/i.test(ua) ? "KakaoTalk" : /Instagram/i.test(ua) ? "Instagram" :
+    /NAVER\(inapp/i.test(ua) ? "Naver" : /\bFBAN|\bFBAV/i.test(ua) ? "Facebook" :
+    /Line\//i.test(ua) ? "LINE" : /DaumApps/i.test(ua) ? "Daum" : "";
+  const isFile = location.protocol === "file:";
+  return { isFile, secure: window.isSecureContext === true && !isFile,
+    protocol: location.protocol,
+    gum: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+    barcode: typeof window.BarcodeDetector !== "undefined", inApp, ua };
+})();
 
-      <details class="manual">
-        <summary id="manualSummary">QR not scanning? Paste the URL</summary>
-        <div class="manual-row">
-          <input class="url-input" id="manualUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://foodqr.kr/01/..." aria-label="FOOD QR URL" />
-          <button class="mini-btn" id="manualButton" type="button">Open</button>
-        </div>
-      </details>
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-      <div class="error" id="errorBox" role="alert"></div>
-    </section>
+function renderDiag(cam){
+  const rows = [
+    ["secure context", ENV.secure ? "yes" : "no"],
+    ["origin", location.origin === "null" ? "file (no origin)" : location.origin],
+    ["getUserMedia", ENV.gum ? "yes" : "no"],
+    ["BarcodeDetector", ENV.barcode ? "native" : "jsQR fallback"],
+    ["in-app browser", ENV.inApp || "no"],
+    ["language", state.lang],
+    ["camera", cam || "idle"],
+    ["ua", ENV.ua.slice(0,80)]
+  ];
+  $("diag").innerHTML = rows.map(([k,v])=>{
+    const cls = v==="no" ? "no" : (v==="yes"||v==="native") ? "yes" : "";
+    return `<div><span>${k}</span><span class="${cls}">${esc(v)}</span></div>`;
+  }).join("");
+}
+function say(kind,title,body,fixes){
+  const el = $("status");
+  el.hidden=false; el.className="status "+kind;
+  el.innerHTML = `<b>${esc(title)}</b>${body?esc(body):""}` +
+    (fixes&&fixes.length ? `<ul class="fix">${fixes.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>` : "");
+}
+const quiet = () => { $("status").hidden = true; };
 
-    <section class="card hidden" id="resultCard" aria-live="polite">
-      <h2 class="card-title" id="resultTitle">QR recognized</h2>
-      <p class="card-desc" id="resultDesc">Check the address, then open the translated official page.</p>
+function loadScript(urls){
+  return new Promise((resolve,reject)=>{
+    let i=0;
+    (function next(){
+      if(i>=urls.length) return reject(new Error("all CDNs failed"));
+      const s=document.createElement("script"); s.src=urls[i++]; s.async=true;
+      s.onload=resolve; s.onerror=()=>{ s.remove(); next(); };
+      document.head.appendChild(s);
+    })();
+  });
+}
+let jsQRReady=null;
+const ensureJsQR = () => window.jsQR ? Promise.resolve()
+  : (jsQRReady = jsQRReady || loadScript([
+      "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js",
+      "https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"]));
 
-      <div class="result-box">
-        <div class="result-status ok" id="resultStatus">✓ Official FOOD QR address</div>
-        <p class="decoded" id="decodedText"></p>
-        <p class="redirect-note hidden" id="redirectNote"></p>
-      </div>
+/* ---------- camera ---------- */
+function cameraBlockedReason(){
+  if(!ENV.secure) return { title:"This page is not on a secure connection",
+    fixes: ENV.isFile
+      ? ["file:// 로 열면 브라우저가 카메라를 차단한다.",
+         "GitHub Pages(https://…github.io/…)에 올려서 열 것.",
+         "로컬 테스트는 http://localhost 만 허용된다."]
+      : ["http:// 주소로는 카메라가 열리지 않는다.","https:// 주소로 다시 접속할 것."] };
+  if(ENV.inApp) return { title: ENV.inApp + " in-app browser blocks the camera",
+    fixes:["우측 상단 메뉴에서 '다른 브라우저로 열기' 선택",
+           "또는 '사진으로 대신하기'를 쓰면 인앱에서도 동작한다."] };
+  if(!ENV.gum) return { title:"This browser has no camera API", fixes:["Chrome 또는 Safari 최신 버전에서 열 것."] };
+  return null;
+}
 
-      <div class="action-stack" style="margin-top: 13px;">
-        <a class="btn btn-primary" id="translateLink" href="#" rel="noopener noreferrer">
-          <span id="translateButtonText">View translated food info</span>
-        </a>
-        <a class="btn btn-secondary" id="originalLink" href="#" rel="noopener noreferrer">
-          <span id="originalButtonText">Open original Korean page</span>
-        </a>
-        <button class="btn btn-ghost" type="button" id="againButton">
-          <span id="againButtonText">Scan another product</span>
-        </button>
-      </div>
+async function startCamera(){
+  quiet(); $("hitSec").hidden = true;
+  const blocked = cameraBlockedReason();
+  if(blocked){ say("err",blocked.title,"",blocked.fixes); renderDiag("blocked"); return; }
 
-      <div class="notice" id="translationNotice">
-        <span aria-hidden="true">!</span>
-        <span id="translationNoticeText">Machine translation may contain errors. For allergens, health risks, or dietary restrictions, verify the original Korean information or ask store staff.</span>
-      </div>
-    </section>
+  $("btnStart").disabled = true;
+  // iOS Safari는 속성만으로 부족하다. 프로퍼티로도 강제해야 인라인 재생된다.
+  video.setAttribute("playsinline",""); video.setAttribute("webkit-playsinline","");
+  video.playsInline = true; video.muted = true; video.autoplay = true;
 
-    <footer class="footer" id="footerText">
-      Prototype: the QR image is decoded locally in your browser. Website translation is provided by an external translation service. Camera access requires HTTPS, which GitHub Pages supports.
-    </footer>
-  </main>
-
-  <script>
-    "use strict";
-
-    const translations = {
-      en: {
-        htmlLang: "en", dir: "ltr",
-        privacyPill: "● Image stays on device",
-        eyebrow: "KOREAN FOOD INFO, IN YOUR LANGUAGE",
-        mainTitle: "Scan once.<br>Understand what you eat.",
-        heroDesc: "Scan the FOOD QR printed on a Korean product package. The official food information page opens in your selected language.",
-        step1: "1. Language", step2: "2. Scan", step3: "3. Translate",
-        languageTitle: "Choose your language",
-        languageDesc: "The interface and translated food page will use this language.",
-        scanTitle: "Scan the FOOD QR",
-        scanDesc: "Point your camera at the QR code, or upload a clear photo containing it.",
-        scanGuideText: "Use the QR labeled “FOOD QR” on the package, not the product barcode.",
-        cameraButtonText: "Scan with camera", uploadButtonText: "Upload a QR photo", stopButtonText: "Stop camera",
-        autoOpenLabel: "Open translation automatically after scanning",
-        manualSummary: "QR not scanning? Paste the URL", manualButton: "Open",
-        resultTitle: "QR recognized", resultDesc: "Check the address, then open the translated official page.",
-        officialStatus: "✓ Official FOOD QR address", otherStatus: "! URL found, but it may not be an official FOOD QR",
-        rawStatus: "! This QR contains text, not a website address",
-        translateButtonText: "View translated food info", translateTextButton: "Translate scanned text",
-        originalButtonText: "Open original Korean page", againButtonText: "Scan another product",
-        redirecting: "Opening the translated page in {seconds} seconds…",
-        translationNoticeText: "Machine translation may contain errors. For allergens, health risks, or dietary restrictions, verify the original Korean information or ask store staff.",
-        footerText: "Prototype: the QR image is decoded locally in your browser. Website translation is provided by an external translation service. Camera access requires HTTPS, which GitHub Pages supports.",
-        cameraStarting: "Starting camera…", cameraScanning: "Place the FOOD QR inside the frame",
-        errNoLibrary: "The QR scanner library could not load. Check your internet connection and reload the page.",
-        errCamera: "The camera could not start. Allow camera permission, use HTTPS, or upload a QR photo instead.",
-        errFile: "No readable QR code was found in this image. Try a sharper, brighter, closer photo.",
-        errUrl: "Enter a valid web address beginning with http:// or https://.",
-        errGeneral: "Something went wrong. Please try again.",
-        open: "Open"
-      },
-      ja: {
-        htmlLang: "ja", dir: "ltr",
-        privacyPill: "● 画像は端末内で処理",
-        eyebrow: "韓国の食品情報を、あなたの言語で",
-        mainTitle: "1回スキャン。<br>食べるものがわかる。",
-        heroDesc: "韓国の商品パッケージにあるFOOD QRを読み取ると、公式食品情報ページを選択した言語で開きます。",
-        step1: "1. 言語", step2: "2. スキャン", step3: "3. 翻訳",
-        languageTitle: "言語を選択",
-        languageDesc: "画面と食品情報ページをこの言語で表示します。",
-        scanTitle: "FOOD QRをスキャン",
-        scanDesc: "カメラをQRコードに向けるか、QRが写った鮮明な写真をアップロードしてください。",
-        scanGuideText: "商品バーコードではなく、パッケージの「FOOD QR」と表示されたQRを使ってください。",
-        cameraButtonText: "カメラでスキャン", uploadButtonText: "QR写真をアップロード", stopButtonText: "カメラを停止",
-        autoOpenLabel: "スキャン後に翻訳ページを自動で開く",
-        manualSummary: "読み取れない場合はURLを貼り付け", manualButton: "開く",
-        resultTitle: "QRを認識しました", resultDesc: "アドレスを確認し、翻訳された公式ページを開いてください。",
-        officialStatus: "✓ 公式FOOD QRアドレス", otherStatus: "! URLを検出しましたが、公式FOOD QRではない可能性があります",
-        rawStatus: "! このQRはウェブアドレスではなくテキストです",
-        translateButtonText: "翻訳された食品情報を見る", translateTextButton: "読み取ったテキストを翻訳",
-        originalButtonText: "韓国語の原文を開く", againButtonText: "別の商品をスキャン",
-        redirecting: "{seconds}秒後に翻訳ページを開きます…",
-        translationNoticeText: "機械翻訳には誤りが含まれる場合があります。アレルギー、健康上のリスク、食事制限については、韓国語の原文を確認するか店舗スタッフにお尋ねください。",
-        footerText: "プロトタイプ：QR画像はブラウザ内で処理されます。ウェブサイト翻訳には外部翻訳サービスを使用します。カメラ利用にはHTTPSが必要で、GitHub PagesはHTTPSに対応しています。",
-        cameraStarting: "カメラを起動中…", cameraScanning: "FOOD QRを枠内に入れてください",
-        errNoLibrary: "QRスキャナーを読み込めませんでした。インターネット接続を確認して再読み込みしてください。",
-        errCamera: "カメラを起動できません。カメラ権限とHTTPSを確認するか、QR写真をアップロードしてください。",
-        errFile: "この画像からQRコードを読み取れませんでした。より明るく、近く、鮮明な写真をお試しください。",
-        errUrl: "http:// または https:// で始まる有効なURLを入力してください。",
-        errGeneral: "エラーが発生しました。もう一度お試しください。",
-        open: "開く"
-      },
-      "zh-CN": {
-        htmlLang: "zh-CN", dir: "ltr",
-        privacyPill: "● 图片仅在设备上处理",
-        eyebrow: "用您的语言查看韩国食品信息",
-        mainTitle: "扫描一次。<br>吃得明白。",
-        heroDesc: "扫描韩国产品包装上的FOOD QR，即可以所选语言打开官方食品信息页面。",
-        step1: "1. 语言", step2: "2. 扫描", step3: "3. 翻译",
-        languageTitle: "选择语言",
-        languageDesc: "界面和翻译后的食品页面将使用此语言。",
-        scanTitle: "扫描FOOD QR",
-        scanDesc: "将相机对准二维码，或上传一张包含二维码的清晰照片。",
-        scanGuideText: "请扫描包装上标有“FOOD QR”的二维码，不要扫描商品条形码。",
-        cameraButtonText: "使用相机扫描", uploadButtonText: "上传二维码照片", stopButtonText: "关闭相机",
-        autoOpenLabel: "扫描后自动打开翻译页面",
-        manualSummary: "无法扫描？粘贴网址", manualButton: "打开",
-        resultTitle: "已识别二维码", resultDesc: "确认网址后，打开翻译后的官方页面。",
-        officialStatus: "✓ 官方FOOD QR网址", otherStatus: "! 已识别网址，但可能不是官方FOOD QR",
-        rawStatus: "! 此二维码包含文字，而不是网页地址",
-        translateButtonText: "查看翻译后的食品信息", translateTextButton: "翻译已扫描的文字",
-        originalButtonText: "打开韩文原始页面", againButtonText: "扫描其他商品",
-        redirecting: "将在{seconds}秒后打开翻译页面…",
-        translationNoticeText: "机器翻译可能存在错误。涉及过敏原、健康风险或饮食限制时，请核对韩文原文或咨询店员。",
-        footerText: "原型说明：二维码图片仅在浏览器本地解码。网页翻译由外部翻译服务提供。相机需要HTTPS，GitHub Pages支持HTTPS。",
-        cameraStarting: "正在启动相机…", cameraScanning: "请将FOOD QR放入取景框内",
-        errNoLibrary: "二维码扫描库加载失败。请检查网络连接并刷新页面。",
-        errCamera: "无法启动相机。请允许相机权限、使用HTTPS，或改为上传二维码照片。",
-        errFile: "未能从图片中识别二维码。请尝试更清晰、更明亮、更近的照片。",
-        errUrl: "请输入以 http:// 或 https:// 开头的有效网址。",
-        errGeneral: "发生错误，请重试。",
-        open: "打开"
-      },
-      es: {
-        htmlLang: "es", dir: "ltr",
-        privacyPill: "● La imagen queda en tu dispositivo",
-        eyebrow: "INFORMACIÓN ALIMENTARIA COREANA, EN TU IDIOMA",
-        mainTitle: "Escanea una vez.<br>Entiende lo que comes.",
-        heroDesc: "Escanea el FOOD QR del envase coreano. La página oficial de información alimentaria se abrirá en el idioma seleccionado.",
-        step1: "1. Idioma", step2: "2. Escanear", step3: "3. Traducir",
-        languageTitle: "Elige tu idioma",
-        languageDesc: "La interfaz y la página traducida usarán este idioma.",
-        scanTitle: "Escanea el FOOD QR",
-        scanDesc: "Apunta la cámara al código QR o sube una foto nítida que lo contenga.",
-        scanGuideText: "Usa el QR marcado como “FOOD QR” en el envase, no el código de barras del producto.",
-        cameraButtonText: "Escanear con cámara", uploadButtonText: "Subir foto del QR", stopButtonText: "Detener cámara",
-        autoOpenLabel: "Abrir la traducción automáticamente al escanear",
-        manualSummary: "¿No se escanea? Pega la URL", manualButton: "Abrir",
-        resultTitle: "QR reconocido", resultDesc: "Comprueba la dirección y abre la página oficial traducida.",
-        officialStatus: "✓ Dirección oficial de FOOD QR", otherStatus: "! Se encontró una URL, pero podría no ser un FOOD QR oficial",
-        rawStatus: "! Este QR contiene texto, no una dirección web",
-        translateButtonText: "Ver información traducida", translateTextButton: "Traducir el texto escaneado",
-        originalButtonText: "Abrir página original en coreano", againButtonText: "Escanear otro producto",
-        redirecting: "Abriendo la página traducida en {seconds} segundos…",
-        translationNoticeText: "La traducción automática puede contener errores. Para alérgenos, riesgos de salud o restricciones alimentarias, verifica el original en coreano o consulta al personal de la tienda.",
-        footerText: "Prototipo: la imagen QR se decodifica localmente en el navegador. La traducción web utiliza un servicio externo. La cámara requiere HTTPS, compatible con GitHub Pages.",
-        cameraStarting: "Iniciando cámara…", cameraScanning: "Coloca el FOOD QR dentro del marco",
-        errNoLibrary: "No se pudo cargar el escáner QR. Comprueba tu conexión y vuelve a cargar la página.",
-        errCamera: "No se pudo iniciar la cámara. Permite el acceso, usa HTTPS o sube una foto del QR.",
-        errFile: "No se encontró un QR legible. Prueba con una foto más nítida, iluminada y cercana.",
-        errUrl: "Introduce una dirección válida que empiece por http:// o https://.",
-        errGeneral: "Ha ocurrido un error. Inténtalo de nuevo.",
-        open: "Abrir"
-      },
-      ar: {
-        htmlLang: "ar", dir: "rtl",
-        privacyPill: "● تبقى الصورة على جهازك",
-        eyebrow: "معلومات الطعام الكوري بلغتك",
-        mainTitle: "امسح مرة واحدة.<br>واعرف ما تأكله.",
-        heroDesc: "امسح رمز FOOD QR المطبوع على عبوة المنتج الكوري لفتح صفحة المعلومات الغذائية الرسمية بلغتك المختارة.",
-        step1: "1. اللغة", step2: "2. المسح", step3: "3. الترجمة",
-        languageTitle: "اختر لغتك",
-        languageDesc: "ستُعرض الواجهة وصفحة الطعام المترجمة بهذه اللغة.",
-        scanTitle: "امسح رمز FOOD QR",
-        scanDesc: "وجّه الكاميرا إلى رمز QR أو ارفع صورة واضحة يظهر فيها الرمز.",
-        scanGuideText: "استخدم رمز QR المكتوب بجانبه “FOOD QR” على العبوة، وليس الباركود الخاص بالمنتج.",
-        cameraButtonText: "المسح بالكاميرا", uploadButtonText: "رفع صورة QR", stopButtonText: "إيقاف الكاميرا",
-        autoOpenLabel: "فتح صفحة الترجمة تلقائيًا بعد المسح",
-        manualSummary: "تعذر المسح؟ الصق الرابط", manualButton: "فتح",
-        resultTitle: "تم التعرف على الرمز", resultDesc: "تحقق من الرابط ثم افتح الصفحة الرسمية المترجمة.",
-        officialStatus: "✓ رابط FOOD QR رسمي", otherStatus: "! تم العثور على رابط، لكنه قد لا يكون FOOD QR رسميًا",
-        rawStatus: "! يحتوي هذا الرمز على نص وليس رابط موقع",
-        translateButtonText: "عرض معلومات الطعام المترجمة", translateTextButton: "ترجمة النص الممسوح",
-        originalButtonText: "فتح الصفحة الكورية الأصلية", againButtonText: "مسح منتج آخر",
-        redirecting: "سيتم فتح الصفحة المترجمة خلال {seconds} ثوانٍ…",
-        translationNoticeText: "قد تحتوي الترجمة الآلية على أخطاء. بالنسبة لمسببات الحساسية أو المخاطر الصحية أو القيود الغذائية، راجع النص الكوري الأصلي أو اسأل موظفي المتجر.",
-        footerText: "نموذج أولي: تتم قراءة صورة QR محليًا داخل المتصفح. تعتمد ترجمة الموقع على خدمة ترجمة خارجية. تتطلب الكاميرا اتصال HTTPS، وهو مدعوم في GitHub Pages.",
-        cameraStarting: "جارٍ تشغيل الكاميرا…", cameraScanning: "ضع FOOD QR داخل الإطار",
-        errNoLibrary: "تعذر تحميل مكتبة مسح QR. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.",
-        errCamera: "تعذر تشغيل الكاميرا. اسمح بإذن الكاميرا واستخدم HTTPS أو ارفع صورة QR بدلًا من ذلك.",
-        errFile: "لم يتم العثور على رمز QR واضح. جرّب صورة أقرب وأكثر إضاءة ووضوحًا.",
-        errUrl: "أدخل رابطًا صالحًا يبدأ بـ http:// أو https://.",
-        errGeneral: "حدث خطأ. حاول مرة أخرى.",
-        open: "فتح"
-      }
+  const attempts = [
+    { video:{ facingMode:{exact:"environment"}, width:{ideal:1920}, height:{ideal:1080} }, audio:false },
+    { video:{ facingMode:{ideal:"environment"}, width:{ideal:1280} }, audio:false },
+    { video:true, audio:false }
+  ];
+  let stream=null, lastErr=null;
+  for(const c of attempts){
+    try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ lastErr=e; }
+  }
+  if(!stream){
+    $("btnStart").disabled = false;
+    const name = (lastErr && lastErr.name) || "";
+    const map = {
+      NotAllowedError:["주소창 자물쇠 아이콘 → 카메라 → 허용",
+                       "iOS: 설정 → Safari → 카메라 → 확인/허용",
+                       "Android: 설정 → 앱 → Chrome → 권한 → 카메라"],
+      NotFoundError:["사용 가능한 카메라를 찾지 못했다.","'사진으로 대신하기'를 사용할 것."],
+      NotReadableError:["다른 앱이 카메라를 점유 중이다. 종료 후 재시도."],
+      OverconstrainedError:["후면 카메라를 찾지 못했다. 새로고침하면 전면으로 재시도한다."],
+      SecurityError:["보안 정책으로 차단되었다. https 주소인지 확인할 것."]
     };
+    say("err","Camera did not open"+(name?" ("+name+")":""),"",map[name]||["다시 시도하거나 '사진으로 대신하기'를 사용할 것."]);
+    renderDiag("error: "+name);
+    return;
+  }
 
-    const ids = [
-      "privacyPill", "eyebrow", "mainTitle", "heroDesc", "step1", "step2", "step3",
-      "languageTitle", "languageDesc", "scanTitle", "scanDesc", "scanGuideText",
-      "cameraButtonText", "uploadButtonText", "stopButtonText", "autoOpenLabel",
-      "manualSummary", "resultTitle", "resultDesc", "translateButtonText",
-      "originalButtonText", "againButtonText", "translationNoticeText", "footerText"
-    ];
+  state.stream = stream; state.track = stream.getVideoTracks()[0];
+  video.srcObject = stream;
+  try{ await video.play(); }
+  catch(e){
+    say("warn","Tap the video to start","",["화면을 한 번 터치하면 재생된다."]);
+    $("stage").addEventListener("click", ()=>video.play().catch(()=>{}), { once:true });
+  }
 
-    let currentLang = "en";
-    let scanner = null;
-    let cameraRunning = false;
-    let redirectTimer = null;
-    let redirectInterval = null;
-    let lastDecoded = "";
+  video.hidden=false; preview.hidden=true; $("idle").hidden=true;
+  $("reticle").hidden=false; $("badge").hidden=false;
+  $("btnStop").hidden=false; $("btnStart").hidden=true;
+  const caps = state.track.getCapabilities ? state.track.getCapabilities() : {};
+  $("btnTorch").hidden = !("torch" in caps);
+  const st = state.track.getSettings ? state.track.getSettings() : {};
+  renderDiag("running " + (st.width ? st.width+"×"+st.height : ""));
+  say("busy", T().scanning, "");
+  startQRLoop();
+}
 
-    const $ = (id) => document.getElementById(id);
-    const t = () => translations[currentLang] || translations.en;
+function stopCamera(){
+  state.scanning=false;
+  if(state.rafId) cancelAnimationFrame(state.rafId);
+  if(state.stream) state.stream.getTracks().forEach(t=>t.stop());
+  state.stream=null; state.track=null; state.torchOn=false;
+  video.srcObject=null; video.hidden=true;
+  $("reticle").hidden=true; $("badge").hidden=true;
+  $("btnStop").hidden=true; $("btnTorch").hidden=true;
+  $("btnStart").hidden=false; $("btnStart").disabled=false;
+  $("idle").hidden=false;
+  renderDiag("stopped");
+}
+async function toggleTorch(){
+  if(!state.track) return;
+  try{
+    state.torchOn = !state.torchOn;
+    await state.track.applyConstraints({ advanced:[{ torch: state.torchOn }] });
+    $("btnTorch").style.background = state.torchOn ? "var(--ink)" : "";
+    $("btnTorch").style.color = state.torchOn ? "#fff" : "";
+  }catch(e){ $("btnTorch").hidden = true; }
+}
 
-    function setText(id, value) {
-      const el = $(id);
-      if (!el || value == null) return;
-      if (id === "mainTitle") el.innerHTML = value;
-      else el.textContent = value;
-    }
-
-    function applyLanguage(lang) {
-      if (!translations[lang]) return;
-      currentLang = lang;
-      const dict = t();
-      document.documentElement.lang = dict.htmlLang;
-      document.documentElement.dir = dict.dir;
-
-      ids.forEach((id) => setText(id, dict[id]));
-      $("manualButton").textContent = dict.manualButton;
-
-      document.querySelectorAll(".lang-btn").forEach((button) => {
-        const selected = button.dataset.lang === lang;
-        button.classList.toggle("selected", selected);
-        button.setAttribute("aria-checked", String(selected));
-      });
-
-      if (lastDecoded) renderResult(lastDecoded, false);
-    }
-
-    function updateStep(stepNumber) {
-      [1, 2, 3].forEach((n) => $("step" + n).classList.toggle("active", n === stepNumber));
-    }
-
-    function showError(message) {
-      const box = $("errorBox");
-      box.textContent = message;
-      box.style.display = "block";
-    }
-
-    function clearError() {
-      const box = $("errorBox");
-      box.textContent = "";
-      box.style.display = "none";
-    }
-
-    function isValidHttpUrl(value) {
-      try {
-        const url = new URL(value);
-        return url.protocol === "http:" || url.protocol === "https:";
-      } catch (_) {
-        return false;
-      }
-    }
-
-    function isFoodQrUrl(value) {
-      if (!isValidHttpUrl(value)) return false;
-      try {
-        const url = new URL(value);
-        const host = url.hostname.toLowerCase();
-        return (host === "foodqr.kr" || host.endsWith(".foodqr.kr")) && /\/01\/\d+/i.test(url.pathname);
-      } catch (_) {
-        return false;
-      }
-    }
-
-    function buildTranslateUrl(decoded) {
-      if (isValidHttpUrl(decoded)) {
-        return "https://translate.google.com/translate?sl=ko&tl=" + encodeURIComponent(currentLang) + "&u=" + encodeURIComponent(decoded);
-      }
-      return "https://translate.google.com/?sl=auto&tl=" + encodeURIComponent(currentLang) + "&text=" + encodeURIComponent(decoded) + "&op=translate";
-    }
-
-    async function stopCamera() {
-      if (cameraRunning && scanner) {
-        try { await scanner.stop(); } catch (_) { /* already stopped */ }
-      }
-      cameraRunning = false;
-      $("stopButton").classList.add("hidden");
-      $("cameraButton").disabled = false;
-      $("cameraButtonText").textContent = t().cameraButtonText;
-    }
-
-    async function createFreshScanner() {
-      await stopCamera();
-      if (scanner) {
-        try { scanner.clear(); } catch (_) { /* container may already be clear */ }
-      }
-      $("reader").innerHTML = "";
-      scanner = new Html5Qrcode("reader", {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false
-      });
-      return scanner;
-    }
-
-    async function startCamera() {
-      clearError();
-      clearRedirects();
-      $("resultCard").classList.add("hidden");
-      updateStep(2);
-
-      if (typeof Html5Qrcode === "undefined") {
-        showError(t().errNoLibrary);
-        return;
-      }
-
-      await createFreshScanner();
-      $("scannerWrap").classList.remove("hidden");
-      $("cameraButton").disabled = true;
-      $("cameraButtonText").textContent = t().cameraStarting;
-
-      const config = {
-        fps: 10,
-        qrbox: (viewWidth, viewHeight) => {
-          const size = Math.floor(Math.min(viewWidth, viewHeight) * 0.68);
-          return { width: Math.max(190, size), height: Math.max(190, size) };
-        },
-        aspectRatio: 1,
-        disableFlip: false
-      };
-
-      try {
-        await scanner.start(
-          { facingMode: { ideal: "environment" } },
-          config,
-          onScanSuccess,
-          () => {}
-        );
-        cameraRunning = true;
-        $("stopButton").classList.remove("hidden");
-        $("cameraButtonText").textContent = t().cameraScanning;
-      } catch (firstError) {
-        try {
-          const cameras = await Html5Qrcode.getCameras();
-          if (!cameras || cameras.length === 0) throw firstError;
-          const preferred = cameras.find((c) => /back|rear|environment/i.test(c.label)) || cameras[cameras.length - 1];
-          await scanner.start(preferred.id, config, onScanSuccess, () => {});
-          cameraRunning = true;
-          $("stopButton").classList.remove("hidden");
-          $("cameraButtonText").textContent = t().cameraScanning;
-        } catch (_) {
-          $("cameraButton").disabled = false;
-          $("cameraButtonText").textContent = t().cameraButtonText;
-          $("scannerWrap").classList.add("hidden");
-          showError(t().errCamera);
+/* ---------- decode ---------- */
+let detector=null;
+async function decodeFrom(source,w,h){
+  if(ENV.barcode){
+    try{
+      if(!detector) detector = new BarcodeDetector({ formats:["qr_code"] });
+      const codes = await detector.detect(source);
+      if(codes && codes.length) return codes[0].rawValue;
+      return "";
+    }catch(e){}
+  }
+  await ensureJsQR();
+  const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+  const ctx=cv.getContext("2d",{willReadFrequently:true});
+  ctx.drawImage(source,0,0,w,h);
+  const img=ctx.getImageData(0,0,w,h);
+  const r=window.jsQR(img.data,w,h,{inversionAttempts:"attemptBoth"});
+  return r ? r.data : "";
+}
+function startQRLoop(){
+  state.scanning = true;
+  const MAX = 720;
+  const tick = async ()=>{
+    if(!state.scanning) return;
+    if(video.readyState >= 2 && video.videoWidth){
+      const s = Math.min(1, MAX/Math.max(video.videoWidth, video.videoHeight));
+      const w = Math.round(video.videoWidth*s), h = Math.round(video.videoHeight*s);
+      try{
+        const data = await decodeFrom(video,w,h);
+        if(data && data !== state.lastQR){
+          state.lastQR = data; state.scanning = false;
+          if(navigator.vibrate) navigator.vibrate(40);
+          stopCamera(); handleQR(data); return;
         }
-      }
+      }catch(e){}
     }
+    state.rafId = requestAnimationFrame(tick);
+  };
+  state.rafId = requestAnimationFrame(tick);
+}
+function loadImage(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=fr.result; };
+    fr.onerror=rej; fr.readAsDataURL(file);
+  });
+}
+function showPreview(img){
+  const MAX=1400, s=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));
+  preview.width=Math.round(img.naturalWidth*s); preview.height=Math.round(img.naturalHeight*s);
+  preview.getContext("2d").drawImage(img,0,0,preview.width,preview.height);
+  preview.hidden=false; video.hidden=true; $("idle").hidden=true;
+}
 
-    async function scanFile(file) {
-      clearError();
-      clearRedirects();
-      updateStep(2);
-      $("resultCard").classList.add("hidden");
+/* ---------- redirect ---------- */
+const isFoodQR = u => { try{ return /(^|\.)foodqr\.kr$/i.test(new URL(u).hostname); }catch(e){ return false; } };
 
-      if (!file) return;
-      if (typeof Html5Qrcode === "undefined") {
-        showError(t().errNoLibrary);
-        return;
-      }
+function translatedUrl(u, lang){
+  const x = new URL(u);
+  const host = x.hostname.replace(/-/g,"--").replace(/\./g,"-");
+  const q = new URLSearchParams(x.search);
+  q.set("_x_tr_sl","ko"); q.set("_x_tr_tl",lang); q.set("_x_tr_hl",lang);
+  return "https://" + host + ".translate.goog" + x.pathname + "?" + q.toString();
+}
 
-      await createFreshScanner();
-      $("scannerWrap").classList.remove("hidden");
+function clearTimer(){ if(state.timer) clearInterval(state.timer); state.timer=null; $("count").hidden=true; }
 
-      try {
-        const decoded = await scanner.scanFile(file, true);
-        onScanSuccess(decoded);
-      } catch (_) {
-        showError(t().errFile);
-      } finally {
-        $("fileInput").value = "";
-      }
-    }
+function handleQR(text){
+  clearTimer();
+  if(!/^https?:\/\//i.test(text)){
+    say("warn","This QR is not a web address","",[text.slice(0,120)]);
+    return;
+  }
+  state.target = text.trim();
+  $("hitUrl").textContent = state.target;
+  $("hitSec").hidden = false;
+  $("hitSec").scrollIntoView({ behavior:"smooth", block:"start" });
 
-    async function onScanSuccess(decodedText) {
-      if (!decodedText || decodedText === lastDecoded) return;
-      lastDecoded = decodedText.trim();
-      await stopCamera();
-      renderResult(lastDecoded, true);
-    }
+  if(!isFoodQR(state.target)){
+    say("warn","Not a FOOD QR","",
+      ["푸드QR이 아닌 QR이다. 태극마크 + FOOD QR 표기를 확인할 것.","그래도 열려면 아래 버튼을 누를 것."]);
+    return;
+  }
+  quiet();
+  if($("autoGo").checked) countdownGo(3);
+}
 
-    function clearRedirects() {
-      if (redirectTimer) clearTimeout(redirectTimer);
-      if (redirectInterval) clearInterval(redirectInterval);
-      redirectTimer = null;
-      redirectInterval = null;
-      $("redirectNote").classList.add("hidden");
-    }
+function countdownGo(n){
+  $("count").hidden = false;
+  const paint = () => { $("count").textContent = T().opening.replace("{n}", n); };
+  paint();
+  state.timer = setInterval(()=>{
+    n--;
+    if(n <= 0){ clearTimer(); go(); return; }
+    paint();
+  }, 1000);
+}
 
-    function renderResult(decoded, allowAutoOpen) {
-      clearError();
-      clearRedirects();
-      updateStep(3);
-      $("resultCard").classList.remove("hidden");
-      $("decodedText").textContent = decoded;
+function go(){
+  clearTimer();
+  if(!state.target) return;
+  window.location.assign(isFoodQR(state.target) ? translatedUrl(state.target, state.lang) : state.target);
+}
 
-      const status = $("resultStatus");
-      const translateLink = $("translateLink");
-      const originalLink = $("originalLink");
-      const isUrl = isValidHttpUrl(decoded);
-      const official = isFoodQrUrl(decoded);
-      const translateUrl = buildTranslateUrl(decoded);
+/* ---------- wiring ---------- */
+function applyLang(){
+  const t = T();
+  document.documentElement.lang = state.lang;
+  $("l_lang").textContent=t.lang; $("l_auto").textContent=t.auto;
+  $("l_found").textContent=t.found; $("l_foot").textContent=t.foot;
+  $("btnStart").textContent=t.start; $("btnStop").textContent=t.stop; $("btnTorch").textContent=t.torch;
+  $("btnPick").textContent=t.pick; $("btnGo").textContent=t.go;
+  $("btnOriginal").textContent=t.korean; $("btnAgain").textContent=t.again;
+  $("idle").textContent = t.idle;
+  [...$("langs").children].forEach(b=>{
+    const on = b.dataset.code === state.lang;
+    b.setAttribute("aria-pressed", on);
+    if(on && !applyLang.scrolled){ applyLang.scrolled=true; b.scrollIntoView({inline:"center",block:"nearest"}); }
+  });
+}
 
-      translateLink.href = translateUrl;
-      translateLink.target = "_self";
+LANGS.forEach(l=>{
+  const b=document.createElement("button");
+  b.className="lang"; b.type="button"; b.dataset.code=l.code; b.textContent=l.label;
+  b.onclick=()=>{
+    state.lang=l.code; localStorage.setItem("flr.lang",l.code);
+    clearTimer(); applyLang(); renderDiag();
+  };
+  $("langs").appendChild(b);
+});
 
-      if (isUrl) {
-        originalLink.href = decoded;
-        originalLink.target = "_blank";
-        originalLink.classList.remove("hidden");
-        $("translateButtonText").textContent = t().translateButtonText;
-        status.className = "result-status " + (official ? "ok" : "warn");
-        status.textContent = official ? t().officialStatus : t().otherStatus;
-      } else {
-        originalLink.classList.add("hidden");
-        $("translateButtonText").textContent = t().translateTextButton;
-        status.className = "result-status warn";
-        status.textContent = t().rawStatus;
-      }
+$("btnStart").onclick = startCamera;
+$("btnStop").onclick  = stopCamera;
+$("btnTorch").onclick = toggleTorch;
+$("btnGo").onclick    = go;
+$("btnOriginal").onclick = ()=>{ clearTimer(); if(state.target) window.location.assign(state.target); };
+$("btnAgain").onclick = ()=>{
+  clearTimer(); $("hitSec").hidden=true; preview.hidden=true; $("idle").hidden=false;
+  state.lastQR=""; state.target=""; quiet(); startCamera();
+};
+$("autoGo").onchange = e => { if(!e.target.checked) clearTimer(); };
+$("btnPick").onclick  = ()=> (ENV.inApp ? $("fileCam") : $("filePick")).click();
+$("btnManual").onclick = ()=>{
+  const v = $("manual").value.trim();
+  if(v) handleQR(v);
+};
 
-      $("resultCard").scrollIntoView({ behavior: "smooth", block: "start" });
+[$("fileCam"),$("filePick")].forEach(inp=>{
+  inp.onchange = async e=>{
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if(!f) return;
+    stopCamera(); quiet(); clearTimer();
+    const im = await loadImage(f);
+    showPreview(im);
+    say("busy", T().scanning, "");
+    const w = Math.min(im.naturalWidth,1400);
+    const h = Math.round(w * im.naturalHeight / im.naturalWidth);
+    const data = await decodeFrom(im, w, h);
+    if(data) handleQR(data);
+    else say("warn","No QR code in this photo","",["푸드QR이 화면 가운데 오도록 다시 촬영할 것."]);
+  };
+});
 
-      if (allowAutoOpen && $("autoOpen").checked) {
-        let seconds = 2;
-        const note = $("redirectNote");
-        note.classList.remove("hidden");
-        note.textContent = t().redirecting.replace("{seconds}", seconds);
-        redirectInterval = setInterval(() => {
-          seconds -= 1;
-          note.textContent = t().redirecting.replace("{seconds}", Math.max(0, seconds));
-        }, 1000);
-        redirectTimer = setTimeout(() => {
-          clearRedirects();
-          window.location.assign(translateUrl);
-        }, 2200);
-      }
-    }
+(function init(){
+  const param = new URLSearchParams(location.search).get("lang");
+  const saved = localStorage.getItem("flr.lang");
+  const nav = navigator.language || "en";
+  const match = c => LANGS.some(l => l.code.toLowerCase() === String(c).toLowerCase());
+  state.lang = match(param) ? param : (saved || (LANGS.find(l =>
+    nav.toLowerCase().startsWith(l.code.toLowerCase().slice(0,2)))?.code) || "en");
 
-    function processManualUrl() {
-      clearError();
-      const value = $("manualUrl").value.trim();
-      if (!isValidHttpUrl(value)) {
-        showError(t().errUrl);
-        return;
-      }
-      lastDecoded = value;
-      renderResult(value, true);
-    }
-
-    function resetForAnotherScan() {
-      clearRedirects();
-      lastDecoded = "";
-      $("resultCard").classList.add("hidden");
-      $("scannerWrap").classList.add("hidden");
-      $("decodedText").textContent = "";
-      updateStep(2);
-      $("scanCard").scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-
-    document.querySelectorAll(".lang-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        clearRedirects();
-        applyLanguage(button.dataset.lang);
-        updateStep(2);
-        $("scanCard").scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
-
-    $("cameraButton").addEventListener("click", startCamera);
-    $("stopButton").addEventListener("click", async () => {
-      await stopCamera();
-      $("scannerWrap").classList.add("hidden");
-    });
-    $("uploadButton").addEventListener("click", () => $("fileInput").click());
-    $("fileInput").addEventListener("change", (event) => scanFile(event.target.files && event.target.files[0]));
-    $("manualButton").addEventListener("click", processManualUrl);
-    $("manualUrl").addEventListener("keydown", (event) => {
-      if (event.key === "Enter") processManualUrl();
-    });
-    $("againButton").addEventListener("click", resetForAnotherScan);
-    $("autoOpen").addEventListener("change", () => {
-      if (!$("autoOpen").checked) clearRedirects();
-    });
-
-    window.addEventListener("pagehide", () => {
-      clearRedirects();
-      if (cameraRunning && scanner) scanner.stop().catch(() => {});
-    });
-
-    window.addEventListener("error", (event) => {
-      if (event && event.message && /Html5Qrcode/i.test(event.message)) showError(t().errNoLibrary);
-    });
-
-    applyLanguage("en");
-  </script>
+  applyLang(); renderDiag("idle");
+  const blocked = cameraBlockedReason();
+  if(blocked){ say("warn", blocked.title, "", blocked.fixes); $("diagDrawer").open = true; }
+  window.addEventListener("pagehide", stopCamera);
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden){ stopCamera(); clearTimer(); } });
+})();
+</script>
 </body>
 </html>
