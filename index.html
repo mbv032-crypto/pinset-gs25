@@ -332,7 +332,7 @@ const T = () => UI[state.lang] || UI.en;
    1. STATE / ENV
    ============================================================ */
 const state = { lang:"en", stream:null, track:null, scanning:false, rafId:null,
-                torchOn:false, lastQR:"", target:"" };
+                torchOn:false, lastQR:"", target:"" , lastRecord:null };
 const $ = id => document.getElementById(id);
 const video = $("video"), preview = $("preview");
 
@@ -699,6 +699,7 @@ async function handleQR(text){
   try{
     const rec = await fetchRecord(state.target);
     say("busy", T().translating, "");
+    state.lastRecord = rec;
     await render(rec);
   }catch(e){
     if(String(e.message) === "NO_ENDPOINT"){
@@ -713,7 +714,7 @@ async function handleQR(text){
 /* ============================================================
    8. RENDER
    ============================================================ */
-async function render(rec){
+async function render(rec, scroll = true){
   const t = T();
   const mats = parseMaterials(rec.materialHtml);
   const official = (rec.allergens || []).map(String);
@@ -784,7 +785,10 @@ async function render(rec){
   $("result").innerHTML = out.join("");
   $("srcTag").textContent = "MFDS"; $("srcTag").className = "src on";
   $("resultSec").hidden = false;
-  $("resultSec").scrollIntoView({ behavior:"smooth", block:"start" });
+  if (scroll) 
+  {
+    $("resultSec").scrollIntoView({behavior: "smooth",block: "start"});
+  }
 }
 
 /* ============================================================
@@ -802,6 +806,7 @@ function applyLang(){
     b.setAttribute("aria-pressed", on);
     if(on && !applyLang.scrolled){ applyLang.scrolled=true; b.scrollIntoView({inline:"center",block:"nearest"}); }
   });
+  if (state.lastRecord) {render(state.lastRecord);}
 }
 
 LANGS.forEach(l=>{
